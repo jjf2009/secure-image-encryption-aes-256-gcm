@@ -132,7 +132,7 @@ const clearComparison = () => {
 };
 
 const computeCanvasSize = (bitmap) => {
-    if (!bitmap?.width || !bitmap?.height) {
+    if (!bitmap || bitmap.width <= 0 || bitmap.height <= 0) {
         return null;
     }
     const scale = Math.min(1, MAX_CANVAS_DIMENSION / bitmap.width, MAX_CANVAS_DIMENSION / bitmap.height);
@@ -171,7 +171,7 @@ const drawEncryptedNoise = (bytes, targetWidth, targetHeight) => {
         state = Math.imul(state, FNV_PRIME);
         sampleIndex = (sampleIndex + sampleStride) % len;
     }
-    // Ensure PRNG state is non-zero after seeding; bytes is non-empty due to guard above.
+    // Guard against a zero state after hashing the ciphertext sample (bytes is non-empty due to guard above).
     if (state === 0) state = FNV_OFFSET_BASIS;
 
     for (let i = 0; i < data.length; i += 4) {
