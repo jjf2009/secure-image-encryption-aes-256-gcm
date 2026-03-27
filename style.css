@@ -303,3 +303,36 @@ footer {
     font-size: 0.9rem;
     text-align: center;
 }
+
+.compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    align-items: start;
+}
+
+@media (max-width: 800px) {
+    .compare-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.compare-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.compare-label {
+    font-weight: 600;
+    color: #1f2937;
+    font-size: 0.95rem;
+}
+
+.compare-canvas {
+    width: 100%;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: #0f172a;
+    display: block;
+}

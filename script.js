@@ -55,6 +55,9 @@ const ciphertextOutput = document.getElementById('ciphertext-output');
 const btnSimulateAttack = document.getElementById('btn-simulate-attack');
 const attackStatus = document.getElementById('attack-status');
 const tamperDisplay = document.getElementById('tamper-display');
+const comparisonCard = document.getElementById('comparison-card');
+const originalCanvas = document.getElementById('original-canvas');
+const encryptedCanvas = document.getElementById('encrypted-canvas');
 
 let encryptedBlobUrl = null;
 let decryptedBlobUrl = null;
@@ -112,6 +115,75 @@ const renderTamperDisplay = (parts, tamperedSegment, tamperedIndex = parts.lengt
     tamperDisplay.innerHTML = segmentsHtml;
 };
 
+const clearComparison = () => {
+    if (comparisonCard) {
+        comparisonCard.style.display = "none";
+    }
+    [originalCanvas, encryptedCanvas].forEach((canvas) => {
+        if (canvas) {
+            const ctx = canvas.getContext('2d');
+            if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+    });
+};
+
+const computeCanvasSize = (bitmap) => {
+    const maxSide = 420;
+    const scale = Math.min(1, maxSide / bitmap.width, maxSide / bitmap.height);
+    return {
+        width: Math.max(1, Math.round(bitmap.width * scale)),
+        height: Math.max(1, Math.round(bitmap.height * scale))
+    };
+};
+
+const drawOriginalImage = (bitmap, targetWidth, targetHeight) => {
+    if (!originalCanvas) return;
+    originalCanvas.width = targetWidth;
+    originalCanvas.height = targetHeight;
+    const ctx = originalCanvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, targetWidth, targetHeight);
+    ctx.drawImage(bitmap, 0, 0, targetWidth, targetHeight);
+};
+
+const drawEncryptedNoise = (bytes, targetWidth, targetHeight) => {
+    if (!encryptedCanvas || !bytes?.length) return;
+    encryptedCanvas.width = targetWidth;
+    encryptedCanvas.height = targetHeight;
+    const ctx = encryptedCanvas.getContext('2d');
+    if (!ctx) return;
+
+    const imageData = ctx.createImageData(targetWidth, targetHeight);
+    const data = imageData.data;
+    const len = bytes.length;
+    let byteIndex = 0;
+
+    for (let i = 0; i < data.length; i += 4) {
+        const base = byteIndex % len;
+        data[i] = bytes[base];
+        data[i + 1] = bytes[(base + 1) % len];
+        data[i + 2] = bytes[(base + 2) % len];
+        data[i + 3] = 255;
+        byteIndex = (byteIndex + 3) % len;
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+};
+
+const renderComparisonPanel = async (file, cipherBytes) => {
+    if (!comparisonCard || !file || !cipherBytes?.length) return;
+    try {
+        const bitmap = await createImageBitmap(file);
+        const { width, height } = computeCanvasSize(bitmap);
+        drawOriginalImage(bitmap, width, height);
+        drawEncryptedNoise(cipherBytes, width, height);
+        comparisonCard.style.display = "block";
+    } catch (err) {
+        console.warn("Comparison panel unavailable:", err);
+        clearComparison();
+    }
+};
+
 // ENCRYPTION
 btnEncrypt.addEventListener('click', async () => {
     const fileInput = document.getElementById('image-upload');
@@ -130,6 +202,7 @@ btnEncrypt.addEventListener('click', async () => {
         spinner.style.display = "inline-block";
         status.style.display = "none";
         downloadArea.style.display = "none";
+        clearComparison();
 
         const file = fileInput.files[0];
         originalFileName = file.name;
@@ -179,6 +252,8 @@ btnEncrypt.addEventListener('click', async () => {
             btnSimulateAttack.disabled = false;
         }
 
+        await renderComparisonPanel(file, ciphertextWithTag);
+
     } catch (e) {
         console.error(e);
         showStatus(status, e.message, false);
@@ -188,6 +263,7 @@ btnEncrypt.addEventListener('click', async () => {
         if (ciphertextOutput) {
             ciphertextOutput.value = "";
         }
+        clearComparison();
     } finally {
         btnEncrypt.disabled = false;
         spinner.style.display = "none";
