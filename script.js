@@ -302,7 +302,7 @@ btnSimulateAttack.addEventListener('click', async () => {
 
     const cipherIndex = parts.length - 1;
     const originalCipherSegment = parts[cipherIndex];
-    const flipIndex = Math.max(0, Math.floor(originalCipherSegment.length / 2));
+    const flipIndex = Math.max(0, Math.floor(Math.random() * Math.max(1, originalCipherSegment.length)));
     const currentChar = originalCipherSegment[flipIndex];
     const currentIndex = BASE64_CHARS.indexOf(currentChar);
     let replacementChar = "A";
@@ -354,7 +354,7 @@ btnSimulateAttack.addEventListener('click', async () => {
         attackStatus.className = "status-box status-error";
         attackStatus.style.display = "block";
     } catch (e) {
-        console.warn("Tampering detected:", e);
+        console.warn("Tampering detected during simulated decrypt.");
         attackStatus.textContent = "⚠️ Tampering Detected — Authentication tag mismatch. GCM integrity check failed.";
         attackStatus.className = "status-box status-error";
         attackStatus.style.display = "block";
