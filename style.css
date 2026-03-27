@@ -170,6 +170,14 @@ textarea {
     background-color: #e5e7eb;
 }
 
+.btn-danger {
+    background-color: var(--error);
+}
+
+.btn-danger:hover {
+    background-color: #dc2626;
+}
+
 .status-box {
     margin-top: 1.5rem;
     padding: 1rem;
@@ -242,4 +250,56 @@ footer {
     font-size: 0.75rem;
     color: var(--text-muted);
     margin-top: 0.5rem;
+}
+
+.attack-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.tamper-display {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+    word-break: break-all;
+}
+
+.tamper-display .segments {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    align-items: center;
+}
+
+.segment-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-right: 0.35rem;
+}
+
+.tamper-chip {
+    display: inline-block;
+    padding: 0.35rem 0.5rem;
+    border-radius: 8px;
+    background: #eef2ff;
+    border: 1px dashed var(--border);
+}
+
+.tampered {
+    background: #fef2f2;
+    color: #b91c1c;
+    border-color: #fecaca;
+}
+
+.attack-explainer {
+    margin-top: 1rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    text-align: center;
 }

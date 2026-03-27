@@ -89,6 +89,28 @@
             </section>
         </main>
 
+        <section class="card">
+            <div class="card-header">
+                <h2>Attack Simulator</h2>
+                <p>Flip a single bit in the ciphertext to see how AES-GCM detects tampering.</p>
+            </div>
+
+            <div class="form-group">
+                <label for="ciphertext-output">Raw Ciphertext Block</label>
+                <textarea id="ciphertext-output" readonly placeholder="Encrypt an image to view the ciphertext block."></textarea>
+                <p class="helper-text">Format: salt:iv:tag:ciphertext</p>
+            </div>
+
+            <div class="attack-actions">
+                <button id="btn-simulate-attack" class="btn btn-danger" disabled>Simulate Bit Flip Attack</button>
+                <div id="attack-status" class="status-box"></div>
+            </div>
+
+            <div id="tamper-display" class="tamper-display" aria-live="polite"></div>
+        </section>
+
+        <p class="attack-explainer">AES-GCM uses an authentication tag to guarantee integrity. Even a single bit change in ciphertext causes decryption to fail — this is called authenticated encryption.</p>
+
         <footer>
             <p>&copy; 2026 Project SecureImage // Client-Side AES-256-GCM Protocol</p>
         </footer>

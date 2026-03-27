@@ -51,10 +51,16 @@ const btnEncrypt = document.getElementById('btn-encrypt');
 const btnDecrypt = document.getElementById('btn-decrypt');
 const btnDownloadTxt = document.getElementById('btn-download-txt');
 const btnDownloadImg = document.getElementById('btn-download-img');
+const ciphertextOutput = document.getElementById('ciphertext-output');
+const btnSimulateAttack = document.getElementById('btn-simulate-attack');
+const attackStatus = document.getElementById('attack-status');
+const tamperDisplay = document.getElementById('tamper-display');
 
 let encryptedBlobUrl = null;
 let decryptedBlobUrl = null;
 let originalFileName = "image.png";
+let lastEncryptedPayload = "";
+let lastEncryptionPassword = "";
 
 const FIXED_SALT = new TextEncoder().encode("SECUREIMAGE_SALT_PBKDF2");
 
@@ -62,6 +68,45 @@ const showStatus = (el, msg, isSuccess) => {
     el.textContent = isSuccess ? "Success: " + msg : "Error: " + msg;
     el.className = `status-box ${isSuccess ? 'status-success' : 'status-error'}`;
     el.style.display = "block";
+};
+
+const resetAttackPanel = () => {
+    if (attackStatus) {
+        attackStatus.style.display = "none";
+        attackStatus.textContent = "";
+    }
+    if (tamperDisplay) {
+        tamperDisplay.innerHTML = "";
+    }
+    if (btnSimulateAttack) {
+        btnSimulateAttack.disabled = true;
+    }
+};
+
+const escapeHtml = (str) => str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+const renderTamperDisplay = (parts, tamperedSegment) => {
+    if (!tamperDisplay) return;
+    const labels = parts.length === 4
+        ? ["Salt", "IV", "Tag", "Ciphertext"]
+        : ["IV", "Tag", "Ciphertext"];
+
+    const segmentsHtml = parts.map((segment, idx) => {
+        const isTampered = idx === parts.length - 1;
+        const content = escapeHtml(idx === parts.length - 1 ? tamperedSegment : segment);
+        const label = labels[idx] || "Segment";
+        return `
+            <div class="segments">
+                <span class="segment-label">${label}</span>
+                <span class="tamper-chip ${isTampered ? 'tampered' : ''}">${content}</span>
+            </div>
+        `;
+    }).join('<span style="color:#9ca3af;">:</span>');
+
+    tamperDisplay.innerHTML = segmentsHtml;
 };
 
 // ENCRYPTION
@@ -120,9 +165,26 @@ btnEncrypt.addEventListener('click', async () => {
         downloadArea.style.display = "block";
         showStatus(status, "Encryption complete.", true);
 
+        // Attack simulator priming
+        lastEncryptedPayload = outputText;
+        lastEncryptionPassword = password;
+        resetAttackPanel();
+        if (ciphertextOutput) {
+            ciphertextOutput.value = outputText;
+        }
+        if (btnSimulateAttack) {
+            btnSimulateAttack.disabled = false;
+        }
+
     } catch (e) {
         console.error(e);
         showStatus(status, e.message, false);
+        resetAttackPanel();
+        lastEncryptedPayload = "";
+        lastEncryptionPassword = "";
+        if (ciphertextOutput) {
+            ciphertextOutput.value = "";
+        }
     } finally {
         btnEncrypt.disabled = false;
         spinner.style.display = "none";
@@ -215,4 +277,75 @@ document.getElementById('txt-upload').addEventListener('change', function(e) {
         document.getElementById('encrypted-text').value = e.target.result;
     };
     reader.readAsText(file);
+});
+
+// Attack Simulator
+btnSimulateAttack.addEventListener('click', async () => {
+    if (!lastEncryptedPayload || !lastEncryptionPassword) {
+        attackStatus.textContent = "Encrypt an image first to generate ciphertext.";
+        attackStatus.className = "status-box status-error";
+        attackStatus.style.display = "block";
+        return;
+    }
+
+    attackStatus.style.display = "none";
+    const parts = lastEncryptedPayload.split(':');
+    if (parts.length < 3) {
+        attackStatus.textContent = "Ciphertext format invalid for simulation.";
+        attackStatus.className = "status-box status-error";
+        attackStatus.style.display = "block";
+        return;
+    }
+
+    const cipherIndex = parts.length - 1;
+    const originalCipherSegment = parts[cipherIndex];
+    const base64Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
+    const flipIndex = Math.max(0, Math.floor(originalCipherSegment.length / 2));
+    const currentChar = originalCipherSegment[flipIndex];
+    const replacementChar = base64Chars[(base64Chars.indexOf(currentChar) + 1) % base64Chars.length];
+    const tamperedSegment = originalCipherSegment.substring(0, flipIndex) + replacementChar + originalCipherSegment.substring(flipIndex + 1);
+
+    const tamperedParts = [...parts];
+    tamperedParts[cipherIndex] = tamperedSegment;
+    const tamperedPayload = tamperedParts.join(':');
+
+    renderTamperDisplay(tamperedParts, tamperedSegment);
+    if (ciphertextOutput) {
+        ciphertextOutput.value = lastEncryptedPayload;
+    }
+
+    try {
+        let salt, iv, tag, ciphertext;
+        if (tamperedParts.length === 4) {
+            salt = new Uint8Array(base64ToArrayBuffer(tamperedParts[0]));
+            iv = new Uint8Array(base64ToArrayBuffer(tamperedParts[1]));
+            tag = new Uint8Array(base64ToArrayBuffer(tamperedParts[2]));
+            ciphertext = new Uint8Array(base64ToArrayBuffer(tamperedParts[3]));
+        } else {
+            salt = FIXED_SALT;
+            iv = new Uint8Array(base64ToArrayBuffer(tamperedParts[0]));
+            tag = new Uint8Array(base64ToArrayBuffer(tamperedParts[1]));
+            ciphertext = new Uint8Array(base64ToArrayBuffer(tamperedParts[2]));
+        }
+
+        const ciphertextWithTag = new Uint8Array(ciphertext.length + tag.length);
+        ciphertextWithTag.set(ciphertext);
+        ciphertextWithTag.set(tag, ciphertext.length);
+
+        const key = await deriveKey(lastEncryptionPassword, salt);
+        await window.crypto.subtle.decrypt(
+            { name: "AES-GCM", iv: iv },
+            key,
+            ciphertextWithTag
+        );
+
+        attackStatus.textContent = "Tampering went undetected (unexpected).";
+        attackStatus.className = "status-box status-success";
+        attackStatus.style.display = "block";
+    } catch (e) {
+        console.warn("Tampering detected:", e);
+        attackStatus.textContent = "⚠️ Tampering Detected — Authentication tag mismatch. GCM integrity check failed.";
+        attackStatus.className = "status-box status-error";
+        attackStatus.style.display = "block";
+    }
 });
