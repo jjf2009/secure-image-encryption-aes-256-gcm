@@ -59,6 +59,9 @@ const comparisonCard = document.getElementById('comparison-card');
 const originalCanvas = document.getElementById('original-canvas');
 const encryptedCanvas = document.getElementById('encrypted-canvas');
 const MAX_CANVAS_DIMENSION = 420;
+const NOISE_SEED_SAMPLE_SIZE = 1024;
+const FNV_OFFSET_BASIS = 0x811c9dc5;
+const FNV_PRIME = 0x01000193;
 
 let encryptedBlobUrl = null;
 let decryptedBlobUrl = null;
@@ -130,7 +133,7 @@ const clearComparison = () => {
 
 const computeCanvasSize = (bitmap) => {
     if (!bitmap?.width || !bitmap?.height) {
-        return { width: 1, height: 1 };
+        return null;
     }
     const scale = Math.min(1, MAX_CANVAS_DIMENSION / bitmap.width, MAX_CANVAS_DIMENSION / bitmap.height);
     return {
@@ -159,15 +162,16 @@ const drawEncryptedNoise = (bytes, targetWidth, targetHeight) => {
     const imageData = ctx.createImageData(targetWidth, targetHeight);
     const data = imageData.data;
     const len = bytes.length;
-    let state = 2166136261;
-    const mixLength = Math.min(len, 1024);
+    let state = FNV_OFFSET_BASIS;
+    const mixLength = Math.min(len, NOISE_SEED_SAMPLE_SIZE);
     for (let i = 0; i < mixLength; i++) {
         state ^= bytes[i];
-        state = Math.imul(state, 16777619);
+        state = Math.imul(state, FNV_PRIME);
     }
     if (state === 0) state = len || 1;
 
     for (let i = 0; i < data.length; i += 4) {
+        // xorshift32 PRNG step to spread ciphertext-derived entropy across pixels
         state ^= state << 13;
         state ^= state >>> 17;
         state ^= state << 5;
@@ -186,7 +190,11 @@ const renderComparisonPanel = async (file, ciphertextWithTagBytes) => {
     if (!comparisonCard || !file || !ciphertextWithTagBytes?.length) return;
     try {
         const bitmap = await createImageBitmap(file);
-        const { width, height } = computeCanvasSize(bitmap);
+        const size = computeCanvasSize(bitmap);
+        if (!size) {
+            throw new Error("Unable to determine image dimensions for comparison.");
+        }
+        const { width, height } = size;
         drawOriginalImage(bitmap, width, height);
         drawEncryptedNoise(ciphertextWithTagBytes, width, height);
         comparisonCard.style.display = "block";
