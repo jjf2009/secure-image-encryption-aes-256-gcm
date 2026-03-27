@@ -163,11 +163,12 @@ const drawEncryptedNoise = (bytes, targetWidth, targetHeight) => {
     const data = imageData.data;
     const len = bytes.length;
     let state = FNV_OFFSET_BASIS;
-    const mixLength = Math.min(len, NOISE_SEED_SAMPLE_SIZE);
-    for (let i = 0; i < mixLength; i++) {
+    const seedSampleLength = Math.min(len, NOISE_SEED_SAMPLE_SIZE);
+    for (let i = 0; i < seedSampleLength; i++) {
         state ^= bytes[i];
         state = Math.imul(state, FNV_PRIME);
     }
+    // Ensure PRNG state is non-zero after seeding; len is non-zero due to early return above.
     if (state === 0) state = len || 1;
 
     for (let i = 0; i < data.length; i += 4) {
