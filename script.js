@@ -159,12 +159,12 @@ const drawEncryptedNoise = (bytes, targetWidth, targetHeight) => {
     let byteIndex = 0;
 
     for (let i = 0; i < data.length; i += 4) {
-        const base = byteIndex % len;
-        data[i] = bytes[base];
-        data[i + 1] = bytes[(base + 1) % len];
-        data[i + 2] = bytes[(base + 2) % len];
+        const startIndex = byteIndex % len;
+        data[i] = bytes[startIndex];
+        data[i + 1] = bytes[(startIndex + 1) % len];
+        data[i + 2] = bytes[(startIndex + 2) % len];
         data[i + 3] = 255;
-        byteIndex = (byteIndex + 3) % len;
+        byteIndex = (byteIndex + 4) % len;
     }
 
     ctx.putImageData(imageData, 0, 0);
