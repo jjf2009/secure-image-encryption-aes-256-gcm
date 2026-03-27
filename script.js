@@ -91,15 +91,15 @@ const escapeHtml = (str) => str
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 
-const renderTamperDisplay = (parts, tamperedSegment) => {
+const renderTamperDisplay = (parts, tamperedSegment, tamperedIndex = parts.length - 1) => {
     if (!tamperDisplay) return;
     const labels = parts.length === 4
         ? ["Salt", "IV", "Tag", "Ciphertext"]
         : ["IV", "Tag", "Ciphertext"];
 
     const segmentsHtml = parts.map((segment, idx) => {
-        const isTampered = idx === parts.length - 1;
-        const content = escapeHtml(idx === parts.length - 1 ? tamperedSegment : segment);
+        const isTampered = idx === tamperedIndex;
+        const content = escapeHtml(isTampered ? tamperedSegment : segment);
         const label = labels[idx] || "Segment";
         return `
             <div class="segments">
@@ -302,7 +302,13 @@ btnSimulateAttack.addEventListener('click', async () => {
 
     const cipherIndex = parts.length - 1;
     const originalCipherSegment = parts[cipherIndex];
-    const flipIndex = Math.max(0, Math.floor(Math.random() * Math.max(1, originalCipherSegment.length)));
+    if (!originalCipherSegment) {
+        attackStatus.textContent = "Ciphertext segment missing; cannot simulate tampering.";
+        attackStatus.className = "status-box status-error";
+        attackStatus.style.display = "block";
+        return;
+    }
+    const flipIndex = Math.floor(Math.random() * Math.max(1, originalCipherSegment.length));
     const currentChar = originalCipherSegment[flipIndex];
     const currentIndex = BASE64_CHARS.indexOf(currentChar);
     let replacementChar = "A";
@@ -314,13 +320,13 @@ btnSimulateAttack.addEventListener('click', async () => {
     } else {
         replacementChar = currentChar === "A" ? "B" : "A";
     }
-    const tamperedSegment = originalCipherSegment.substring(0, flipIndex) + replacementChar + originalCipherSegment.substring(flipIndex + 1);
+    const tamperedSegment = `${originalCipherSegment.substring(0, flipIndex)}${replacementChar}${originalCipherSegment.substring(flipIndex + 1)}`;
 
     const tamperedParts = [...parts];
     tamperedParts[cipherIndex] = tamperedSegment;
     const tamperedPayload = tamperedParts.join(':');
 
-    renderTamperDisplay(tamperedParts, tamperedSegment);
+    renderTamperDisplay(tamperedParts, tamperedSegment, cipherIndex);
     if (ciphertextOutput) {
         ciphertextOutput.value = tamperedPayload;
     }
