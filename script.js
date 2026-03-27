@@ -171,7 +171,7 @@ const drawEncryptedNoise = (bytes, targetWidth, targetHeight) => {
         state = Math.imul(state, FNV_PRIME);
         sampleIndex = (sampleIndex + sampleStride) % len;
     }
-    // Ensure PRNG state is non-zero after seeding; bytes length is non-zero due to early return above.
+    // Ensure PRNG state is non-zero after seeding; bytes is non-empty due to guard above.
     if (state === 0) state = FNV_OFFSET_BASIS;
 
     for (let i = 0; i < data.length; i += 4) {
@@ -192,8 +192,17 @@ const drawEncryptedNoise = (bytes, targetWidth, targetHeight) => {
 
 const renderComparisonPanel = async (file, ciphertextWithTagBytes) => {
     if (!comparisonCard || !file || !ciphertextWithTagBytes?.length) return;
+
+    let bitmap;
     try {
-        const bitmap = await createImageBitmap(file);
+        bitmap = await createImageBitmap(file);
+    } catch (err) {
+        console.warn("Comparison panel unavailable: image decoding failed.", err);
+        clearComparison();
+        return;
+    }
+
+    try {
         const size = computeCanvasSize(bitmap);
         if (!size) {
             throw new Error("Unable to determine image dimensions for comparison.");
@@ -203,7 +212,7 @@ const renderComparisonPanel = async (file, ciphertextWithTagBytes) => {
         drawEncryptedNoise(ciphertextWithTagBytes, width, height);
         comparisonCard.style.display = "block";
     } catch (err) {
-        console.warn("Comparison panel unavailable (image decode or canvas render failed):", err);
+        console.warn("Comparison panel unavailable during canvas rendering.", err);
         clearComparison();
     }
 };
