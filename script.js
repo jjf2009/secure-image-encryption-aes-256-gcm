@@ -163,10 +163,10 @@ const drawEncryptedNoise = (bytes, targetWidth, targetHeight) => {
     const data = imageData.data;
     const len = bytes.length;
     let state = FNV_OFFSET_BASIS;
-    const seedSampleLength = Math.min(len, NOISE_SEED_SAMPLE_SIZE);
-    const sampleStride = Math.max(1, Math.ceil(len / seedSampleLength));
+    const actualSampleSize = Math.min(len, NOISE_SEED_SAMPLE_SIZE);
+    const sampleStride = Math.max(1, Math.floor(len / actualSampleSize));
     let sampleIndex = 0;
-    for (let sampled = 0; sampled < seedSampleLength; sampled++) {
+    for (let sampled = 0; sampled < actualSampleSize; sampled++) {
         state ^= bytes[sampleIndex];
         state = Math.imul(state, FNV_PRIME);
         sampleIndex = (sampleIndex + sampleStride) % len;
