@@ -63,6 +63,7 @@ let lastEncryptedPayload = "";
 let lastEncryptionPassword = "";
 
 const FIXED_SALT = new TextEncoder().encode("SECUREIMAGE_SALT_PBKDF2");
+const BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
 
 const showStatus = (el, msg, isSuccess) => {
     el.textContent = isSuccess ? "Success: " + msg : "Error: " + msg;
@@ -86,7 +87,9 @@ const resetAttackPanel = () => {
 const escapeHtml = (str) => str
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 
 const renderTamperDisplay = (parts, tamperedSegment) => {
     if (!tamperDisplay) return;
@@ -104,7 +107,7 @@ const renderTamperDisplay = (parts, tamperedSegment) => {
                 <span class="tamper-chip ${isTampered ? 'tampered' : ''}">${content}</span>
             </div>
         `;
-    }).join('<span style="color:#9ca3af;">:</span>');
+    }).join('<span style="color: var(--text-muted);">:</span>');
 
     tamperDisplay.innerHTML = segmentsHtml;
 };
@@ -299,15 +302,14 @@ btnSimulateAttack.addEventListener('click', async () => {
 
     const cipherIndex = parts.length - 1;
     const originalCipherSegment = parts[cipherIndex];
-    const base64Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
     const flipIndex = Math.max(0, Math.floor(originalCipherSegment.length / 2));
     const currentChar = originalCipherSegment[flipIndex];
-    const currentIndex = base64Chars.indexOf(currentChar);
+    const currentIndex = BASE64_CHARS.indexOf(currentChar);
     let replacementChar = "A";
     if (currentIndex >= 0) {
-        replacementChar = base64Chars[(currentIndex + 1) % base64Chars.length];
+        replacementChar = BASE64_CHARS[(currentIndex + 1) % BASE64_CHARS.length];
         if (replacementChar === currentChar) {
-            replacementChar = base64Chars[(currentIndex + 2) % base64Chars.length];
+            replacementChar = BASE64_CHARS[(currentIndex + 2) % BASE64_CHARS.length];
         }
     } else {
         replacementChar = currentChar === "A" ? "B" : "A";
@@ -349,7 +351,7 @@ btnSimulateAttack.addEventListener('click', async () => {
         );
 
         attackStatus.textContent = "Tampering went undetected (unexpected).";
-        attackStatus.className = "status-box status-success";
+        attackStatus.className = "status-box status-error";
         attackStatus.style.display = "block";
     } catch (e) {
         console.warn("Tampering detected:", e);
