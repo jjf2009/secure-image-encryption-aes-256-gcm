@@ -129,6 +129,9 @@ const clearComparison = () => {
 };
 
 const computeCanvasSize = (bitmap) => {
+    if (!bitmap?.width || !bitmap?.height) {
+        return { width: 1, height: 1 };
+    }
     const scale = Math.min(1, MAX_CANVAS_DIMENSION / bitmap.width, MAX_CANVAS_DIMENSION / bitmap.height);
     return {
         width: Math.max(1, Math.round(bitmap.width * scale)),
@@ -156,11 +159,17 @@ const drawEncryptedNoise = (bytes, targetWidth, targetHeight) => {
     const imageData = ctx.createImageData(targetWidth, targetHeight);
     const data = imageData.data;
     const len = bytes.length;
-    let state = len;
+    let state = 2166136261;
+    const mixLength = Math.min(len, 1024);
+    for (let i = 0; i < mixLength; i++) {
+        state ^= bytes[i];
+        state = Math.imul(state, 16777619);
+    }
+    if (state === 0) state = len || 1;
 
-    for (let i = 0, pixel = 0; i < data.length; i += 4, pixel++) {
+    for (let i = 0; i < data.length; i += 4) {
         state ^= state << 13;
-        state ^= state >> 17;
+        state ^= state >>> 17;
         state ^= state << 5;
         state >>>= 0;
         const startIndex = state % len;
