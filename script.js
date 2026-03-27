@@ -156,27 +156,25 @@ const drawEncryptedNoise = (bytes, targetWidth, targetHeight) => {
     const imageData = ctx.createImageData(targetWidth, targetHeight);
     const data = imageData.data;
     const len = bytes.length;
-    let byteIndex = 0;
 
     for (let i = 0, pixel = 0; i < data.length; i += 4, pixel++) {
-        const startIndex = (byteIndex + pixel) % len;
+        const startIndex = (pixel * 3) % len;
         data[i] = bytes[startIndex];
         data[i + 1] = bytes[(startIndex + 1) % len];
         data[i + 2] = bytes[(startIndex + 2) % len];
         data[i + 3] = 255;
-        byteIndex = (byteIndex + 3) % len;
     }
 
     ctx.putImageData(imageData, 0, 0);
 };
 
-const renderComparisonPanel = async (file, cipherBytes) => {
-    if (!comparisonCard || !file || !cipherBytes?.length) return;
+const renderComparisonPanel = async (file, ciphertextWithTagBytes) => {
+    if (!comparisonCard || !file || !ciphertextWithTagBytes?.length) return;
     try {
         const bitmap = await createImageBitmap(file);
         const { width, height } = computeCanvasSize(bitmap);
         drawOriginalImage(bitmap, width, height);
-        drawEncryptedNoise(cipherBytes, width, height);
+        drawEncryptedNoise(ciphertextWithTagBytes, width, height);
         comparisonCard.style.display = "block";
     } catch (err) {
         console.warn("Comparison panel unavailable:", err);
