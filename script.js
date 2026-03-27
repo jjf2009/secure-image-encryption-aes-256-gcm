@@ -3,7 +3,7 @@
  */
 
 // Key Derivation logic
-const getEncryptionKey = async (password, salt) => {
+const deriveKey = async (password, salt) => {
     const encoder = new TextEncoder();
     const passwordKey = await window.crypto.subtle.importKey(
         "raw",
@@ -88,7 +88,8 @@ btnEncrypt.addEventListener('click', async () => {
         const arrayBuffer = await file.arrayBuffer();
 
         const iv = window.crypto.getRandomValues(new Uint8Array(12));
-        const key = await getEncryptionKey(password, FIXED_SALT);
+        const salt = window.crypto.getRandomValues(new Uint8Array(16));
+        const key = await deriveKey(password, salt);
 
         const encryptedData = await window.crypto.subtle.encrypt(
             { name: "AES-GCM", iv: iv },
@@ -101,11 +102,12 @@ btnEncrypt.addEventListener('click', async () => {
         const ciphertext = ciphertextWithTag.slice(0, ciphertextWithTag.length - tagSize);
         const tag = ciphertextWithTag.slice(ciphertextWithTag.length - tagSize);
 
+        const saltB64 = arrayBufferToBase64(salt);
         const ivB64 = arrayBufferToBase64(iv);
         const tagB64 = arrayBufferToBase64(tag);
         const dataB64 = arrayBufferToBase64(ciphertext);
 
-        const outputText = `${ivB64}:${tagB64}:${dataB64}`;
+        const outputText = `${saltB64}:${ivB64}:${tagB64}:${dataB64}`;
 
         const blob = new Blob([outputText], { type: 'text/plain' });
         if (encryptedBlobUrl) URL.revokeObjectURL(encryptedBlobUrl);
@@ -149,17 +151,31 @@ btnDecrypt.addEventListener('click', async () => {
         btnDownloadImg.style.display = "none";
 
         const parts = encryptedText.split(':');
-        if (parts.length < 3) throw new Error("Invalid format.");
+        if (parts.length !== 4 && parts.length !== 3) throw new Error("Invalid format.");
 
-        const iv = new Uint8Array(base64ToArrayBuffer(parts[0]));
-        const tag = new Uint8Array(base64ToArrayBuffer(parts[1]));
-        const ciphertext = new Uint8Array(base64ToArrayBuffer(parts[2]));
+        let salt;
+        let iv;
+        let tag;
+        let ciphertext;
+
+        if (parts.length === 4) {
+            salt = new Uint8Array(base64ToArrayBuffer(parts[0]));
+            iv = new Uint8Array(base64ToArrayBuffer(parts[1]));
+            tag = new Uint8Array(base64ToArrayBuffer(parts[2]));
+            ciphertext = new Uint8Array(base64ToArrayBuffer(parts[3]));
+        } else {
+            // Backward compatibility with older format (iv:tag:ciphertext) using fixed salt
+            salt = FIXED_SALT;
+            iv = new Uint8Array(base64ToArrayBuffer(parts[0]));
+            tag = new Uint8Array(base64ToArrayBuffer(parts[1]));
+            ciphertext = new Uint8Array(base64ToArrayBuffer(parts[2]));
+        }
 
         const ciphertextWithTag = new Uint8Array(ciphertext.length + tag.length);
         ciphertextWithTag.set(ciphertext);
         ciphertextWithTag.set(tag, ciphertext.length);
 
-        const key = await getEncryptionKey(password, FIXED_SALT);
+        const key = await deriveKey(password, salt);
 
         const decryptedBuffer = await window.crypto.subtle.decrypt(
             { name: "AES-GCM", iv: iv },
