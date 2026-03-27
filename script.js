@@ -58,6 +58,7 @@ const tamperDisplay = document.getElementById('tamper-display');
 const comparisonCard = document.getElementById('comparison-card');
 const originalCanvas = document.getElementById('original-canvas');
 const encryptedCanvas = document.getElementById('encrypted-canvas');
+const MAX_CANVAS_DIMENSION = 420;
 
 let encryptedBlobUrl = null;
 let decryptedBlobUrl = null;
@@ -128,8 +129,7 @@ const clearComparison = () => {
 };
 
 const computeCanvasSize = (bitmap) => {
-    const maxSide = 420;
-    const scale = Math.min(1, maxSide / bitmap.width, maxSide / bitmap.height);
+    const scale = Math.min(1, MAX_CANVAS_DIMENSION / bitmap.width, MAX_CANVAS_DIMENSION / bitmap.height);
     return {
         width: Math.max(1, Math.round(bitmap.width * scale)),
         height: Math.max(1, Math.round(bitmap.height * scale))
@@ -158,13 +158,13 @@ const drawEncryptedNoise = (bytes, targetWidth, targetHeight) => {
     const len = bytes.length;
     let byteIndex = 0;
 
-    for (let i = 0; i < data.length; i += 4) {
-        const startIndex = byteIndex % len;
+    for (let i = 0, pixel = 0; i < data.length; i += 4, pixel++) {
+        const startIndex = (byteIndex + pixel) % len;
         data[i] = bytes[startIndex];
         data[i + 1] = bytes[(startIndex + 1) % len];
         data[i + 2] = bytes[(startIndex + 2) % len];
         data[i + 3] = 255;
-        byteIndex = (byteIndex + 4) % len;
+        byteIndex = (byteIndex + 3) % len;
     }
 
     ctx.putImageData(imageData, 0, 0);
