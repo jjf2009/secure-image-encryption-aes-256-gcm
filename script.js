@@ -171,11 +171,11 @@ const drawEncryptedNoise = (bytes, targetWidth, targetHeight) => {
         state = Math.imul(state, FNV_PRIME);
         sampleIndex = (sampleIndex + sampleStride) % len;
     }
-    // Ensure PRNG state is non-zero after seeding; len is non-zero due to early return above.
+    // Ensure PRNG state is non-zero after seeding; bytes length is non-zero due to early return above.
     if (state === 0) state = FNV_OFFSET_BASIS;
 
     for (let i = 0; i < data.length; i += 4) {
-        // XORShift32 PRNG step to spread ciphertext-derived entropy across pixels
+        // Xorshift32 PRNG step to spread ciphertext-derived entropy across pixels
         state ^= state << 13;
         state ^= state >>> 17;
         state ^= state << 5;
