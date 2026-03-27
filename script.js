@@ -302,7 +302,16 @@ btnSimulateAttack.addEventListener('click', async () => {
     const base64Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
     const flipIndex = Math.max(0, Math.floor(originalCipherSegment.length / 2));
     const currentChar = originalCipherSegment[flipIndex];
-    const replacementChar = base64Chars[(base64Chars.indexOf(currentChar) + 1) % base64Chars.length];
+    const currentIndex = base64Chars.indexOf(currentChar);
+    let replacementChar = "A";
+    if (currentIndex >= 0) {
+        replacementChar = base64Chars[(currentIndex + 1) % base64Chars.length];
+        if (replacementChar === currentChar) {
+            replacementChar = base64Chars[(currentIndex + 2) % base64Chars.length];
+        }
+    } else {
+        replacementChar = currentChar === "A" ? "B" : "A";
+    }
     const tamperedSegment = originalCipherSegment.substring(0, flipIndex) + replacementChar + originalCipherSegment.substring(flipIndex + 1);
 
     const tamperedParts = [...parts];
@@ -311,7 +320,7 @@ btnSimulateAttack.addEventListener('click', async () => {
 
     renderTamperDisplay(tamperedParts, tamperedSegment);
     if (ciphertextOutput) {
-        ciphertextOutput.value = lastEncryptedPayload;
+        ciphertextOutput.value = tamperedPayload;
     }
 
     try {
