@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecureImage — Professional Encryption</title>
+    <!-- Refined Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2280%22>🛡️</text></svg>">
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>SecureImage</h1>
+            <p>Shield your visual data with AES-256-GCM encryption. Private, secure, and purely client-side.</p>
+        </header>
+
+        <main class="main-grid">
+            <!-- ENCRYPT BLOCK -->
+            <section class="card">
+                <div class="card-header">
+                    <h2>Encrypt Image</h2>
+                    <p>Convert your image to a secure text-based data block.</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="image-upload">Source Image</label>
+                    <input type="file" id="image-upload" accept="image/*">
+                    <p class="helper-text">Supports JPEG, PNG, WEBP, etc.</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="encrypt-password">Secret Passphrase</label>
+                    <input type="password" id="encrypt-password" placeholder="e.g. your-secure-password">
+                </div>
+
+                <button id="btn-encrypt" class="btn">
+                    <span class="spinner" id="encrypt-spinner"></span>
+                    <span>Encrypt Now</span>
+                </button>
+
+                <div id="encrypt-status" class="status-box"></div>
+
+                <div id="download-area" style="display: none; margin-top: 1.5rem; text-align: center;">
+                    <a id="btn-download-txt" class="btn btn-secondary" style="text-decoration: none; width: auto; display: inline-flex;">
+                        Download encrypt.txt
+                    </a>
+                    <p class="helper-text">Save this file, you'll need it for decryption.</p>
+                </div>
+            </section>
+
+            <!-- DECRYPT BLOCK -->
+            <section class="card">
+                <div class="card-header">
+                    <h2>Decrypt Image</h2>
+                    <p>Restore encrypted blocks back into their original visual form.</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="encrypted-text">Data Block (or upload file)</label>
+                    <textarea id="encrypted-text" placeholder="IV:Tag:Data..."></textarea>
+                    <div style="margin-top: 0.75rem;">
+                        <input type="file" id="txt-upload" accept=".txt">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="decrypt-password">Original Passphrase</label>
+                    <input type="password" id="decrypt-password" placeholder="The password used during encryption">
+                </div>
+
+                <button id="btn-decrypt" class="btn btn-secondary">
+                    <span class="spinner" id="decrypt-spinner"></span>
+                    <span>Decrypt & Restore</span>
+                </button>
+
+                <div id="decrypt-status" class="status-box"></div>
+
+                <div id="preview-area" class="preview-box">
+                    <img id="decrypted-preview" alt="Decrypted Outcome">
+                </div>
+
+                <a id="btn-download-img" class="btn" style="display: none; width: 100%; margin-top: 2rem; text-decoration: none;">
+                    Download Restored Image
+                </a>
+            </section>
+        </main>
+
+        <footer>
+            <p>&copy; 2026 Project SecureImage // Client-Side AES-256-GCM Protocol</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
