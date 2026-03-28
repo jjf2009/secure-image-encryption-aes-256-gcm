@@ -156,7 +156,7 @@ const sanitizeFileName = (name) => {
     const dotIndex = stripped.lastIndexOf(".");
     const nameRoot = dotIndex === -1 ? (stripped || "file") : stripped.slice(0, dotIndex);
     const extension = dotIndex === -1 ? "" : stripped.slice(dotIndex);
-    const baseRoot = (nameRoot.split(".")[0] || nameRoot || "file").toUpperCase();
+    const baseRoot = (nameRoot.split(".")[0] || "file").toUpperCase();
     const needsAdjust = RESERVED_FILENAMES.has(baseRoot);
     const adjustedRoot = needsAdjust ? `${nameRoot}_file` : nameRoot;
     const candidate = `${adjustedRoot}${extension}`.replace(/^\.+/, "") || DEFAULT_FILE_NAME;
@@ -512,7 +512,7 @@ btnDecrypt.addEventListener('click', async () => {
         const delimiterStart = metadataEnd;
         const delimiterEnd = delimiterStart + delimiterBytes.length;
 
-        if (metadataLength <= 0 || metadataLength > MAX_METADATA_SIZE || delimiterEnd > decryptedBytes.length) {
+        if (metadataLength < 0 || metadataLength > MAX_METADATA_SIZE || delimiterEnd > decryptedBytes.length) {
             throw new Error("Invalid metadata length.");
         }
 
@@ -537,7 +537,7 @@ btnDecrypt.addEventListener('click', async () => {
         const safeName = sanitizeFileName(metadata?.name);
         const actualSize = fileBytes.length;
         const parsedSize = Number(metadata?.size);
-        const reportedSize = (Number.isFinite(parsedSize) && Number.isSafeInteger(parsedSize) && parsedSize >= 0 && parsedSize <= MAX_FILESIZE_BYTES)
+        const reportedSize = (Number.isFinite(parsedSize) && Number.isInteger(parsedSize) && parsedSize >= 0 && parsedSize <= MAX_FILESIZE_BYTES)
             ? parsedSize
             : null;
         if (reportedSize !== null && reportedSize !== actualSize) {
