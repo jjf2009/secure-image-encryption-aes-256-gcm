@@ -470,8 +470,11 @@ btnDecrypt.addEventListener('click', async () => {
 
         const decryptedBytes = new Uint8Array(decryptedBuffer);
         const delimiterBytes = new TextEncoder().encode(METADATA_DELIMITER);
-        const findDelimiterIndex = () => {
-            const buildPrefixTable = (pattern) => {
+        const findDelimiterIndexKMP = () => {
+            // Use Knuth–Morris–Pratt (KMP) to locate the delimiter efficiently within the decrypted bytes.
+            // The LPS (longest proper prefix that is also a suffix) table allows the search to skip ahead
+            // when partial matches fail, avoiding redundant comparisons.
+            const buildLPSTable = (pattern) => {
                 const table = new Array(pattern.length).fill(0);
                 let len = 0;
                 for (let i = 1; i < pattern.length; i++) {
@@ -486,7 +489,7 @@ btnDecrypt.addEventListener('click', async () => {
                 return table;
             };
 
-            const lps = buildPrefixTable(delimiterBytes);
+            const lps = buildLPSTable(delimiterBytes);
             let i = 0;
             let j = 0;
             while (i < decryptedBytes.length) {
@@ -505,7 +508,7 @@ btnDecrypt.addEventListener('click', async () => {
             return -1;
         };
 
-        const delimiterIndex = findDelimiterIndex();
+        const delimiterIndex = findDelimiterIndexKMP();
         if (delimiterIndex < 0) {
             throw new Error("Metadata delimiter not found in decrypted payload.");
         }
@@ -526,30 +529,38 @@ btnDecrypt.addEventListener('click', async () => {
         }
 
         const sanitizeFileName = (name) => {
+            const warnAndStripPath = (value) => {
+                if (/[\\/]/.test(value)) {
+                    console.warn("Embedded filename contained path separators; using last segment.");
+                }
+                return value.split(/[\\/]/).pop();
+            };
+            const removeControlChars = (value) => value.replace(/[\x00-\x1F\x80-\x9F]/g, "");
+            const replaceIllegalChars = (value) => value.replace(/[<>:"/\\|?*]/g, "_").trim();
+            const ensureNonReservedName = (root, extension) => {
+                const adjustedRoot = RESERVED_FILENAMES.has(root.toUpperCase()) ? `${root}_file` : root;
+                return `${adjustedRoot}${extension}`.replace(/^\.+/, "") || "image.bin";
+            };
+
             const originalName = name || "image.bin";
-            if (/[\\/]/.test(originalName)) {
-                console.warn("Embedded filename contained path separators; using last segment.");
-            }
-            const base = originalName.split(/[\\/]/).pop();
-            const withoutControl = base.replace(/[\x00-\x1F\x80-\x9F]/g, "");
-            const cleaned = withoutControl.replace(/[<>:"/\\|?*]/g, "_").trim();
+            const base = warnAndStripPath(originalName);
+            const withoutControl = removeControlChars(base);
+            const cleaned = replaceIllegalChars(withoutControl);
             const stripped = cleaned.replace(/^\.+/, "").replace(/\.+$/, "");
             const safeBase = stripped || "image";
             const dotIndex = safeBase.lastIndexOf(".");
             const nameRoot = dotIndex === -1 ? safeBase : safeBase.slice(0, dotIndex);
             const extension = dotIndex === -1 ? "" : safeBase.slice(dotIndex);
-            const adjustedRoot = RESERVED_FILENAMES.has(nameRoot.toUpperCase()) ? `${nameRoot}_file` : nameRoot;
-            const candidateName = `${adjustedRoot}${extension}`.replace(/^\.+/, "");
-            return candidateName || "image.bin";
+            return ensureNonReservedName(nameRoot, extension);
         };
 
         const safeName = sanitizeFileName(metadata?.name);
         const actualSize = fileBytes.length;
+        const isValidFileSize = (size) =>
+            !Number.isNaN(size) && Number.isSafeInteger(size) && size >= 0;
+
         const parsedSize = Number(metadata?.size);
-        let reportedSize = null;
-        if (!Number.isNaN(parsedSize) && Number.isSafeInteger(parsedSize) && parsedSize >= 0) {
-            reportedSize = parsedSize;
-        }
+        const reportedSize = isValidFileSize(parsedSize) ? parsedSize : null;
         if (reportedSize !== null && reportedSize !== actualSize) {
             console.warn(`Embedded metadata size (${reportedSize}) did not match decrypted content size (${actualSize}). Using actual size.`);
         }
