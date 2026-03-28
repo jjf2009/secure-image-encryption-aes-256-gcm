@@ -61,14 +61,15 @@
                                 <label for="criteria-number">Contains numbers</label>
                             </li>
                             <li class="criteria-item" data-criterion="special">
-                                <input type="checkbox" id="criteria-special" disabled>
-                                <label for="criteria-special" title="Includes punctuation such as !@#$%^&*()[]{};:' &quot; ,.&lt;&gt;/?`|~">Contains special characters</label>
+                                <input type="checkbox" id="criteria-special" aria-describedby="criteria-special-help" disabled>
+                                <label for="criteria-special">Contains special characters</label>
                             </li>
                             <li class="criteria-item" data-criterion="notCommon">
                                 <input type="checkbox" id="criteria-common" disabled>
                                 <label for="criteria-common">Not a common password</label>
                             </li>
                         </ul>
+                        <p class="helper-text" id="criteria-special-help"></p>
                     </div>
                 </div>
 

@@ -63,6 +63,7 @@ const encryptPasswordInput = document.getElementById('encrypt-password');
 const strengthBar = document.getElementById('password-strength-bar');
 const strengthLabel = document.getElementById('password-strength-label');
 const strengthWarning = document.getElementById('password-strength-warning');
+const specialCharHelp = document.getElementById('criteria-special-help');
 const criteriaCheckboxes = {
     minLength: document.getElementById('criteria-length'),
     longLength: document.getElementById('criteria-long'),
@@ -123,8 +124,9 @@ const COMMON_PASSWORDS = [
 ];
 const MIN_PASSWORD_LENGTH = 8;
 const STRONG_PASSWORD_LENGTH = 12;
-// Broad punctuation coverage for special-character detection (e.g., !@#$%^&*()_+-=[]{};:'",.<>/?\|~ and the backtick `).
-const SPECIAL_CHAR_PATTERN = /[!@#$%^&*()_\-+=\[\]{};:'",.<>/?\\|~`]/;
+const SPECIAL_CHARACTERS = '!@#$%^&*()_+-=[]{};:\'",.<>/?\\|~`';
+const escapeForCharClass = (chars) => chars.replace(/[\\\]\[\^-]/g, '\\$&');
+const SPECIAL_CHAR_PATTERN = new RegExp(`[${escapeForCharClass(SPECIAL_CHARACTERS)}]`);
 const STRENGTH_SCORE_MAX = {
     weak: 2,
     fair: 4,
@@ -142,6 +144,11 @@ const STRENGTH_CLASSES = {
     strong: "strength-strong",
     veryStrong: "strength-very-strong"
 };
+const SPECIAL_CHAR_HELP_TEXT = `Special characters include: ${SPECIAL_CHARACTERS}`;
+
+if (specialCharHelp) {
+    specialCharHelp.textContent = SPECIAL_CHAR_HELP_TEXT;
+}
 
 const getPrimaryColor = () => {
     if (primaryColorCache) return primaryColorCache;
