@@ -121,6 +121,11 @@ const COMMON_PASSWORDS = [
     "iloveyou", "1q2w3e4r", "000000", "letmein", "dragon",
     "sunshine", "princess", "monkey", "login", "password123"
 ];
+const STRENGTH_THRESHOLDS = {
+    weak: 2,
+    fair: 3,
+    strong: 5
+};
 
 const getPrimaryColor = () => {
     if (primaryColorCache) return primaryColorCache;
@@ -158,16 +163,16 @@ const evaluatePasswordCriteria = (password) => {
         longLength: password.length >= 12,
         upperLower: /[a-z]/.test(password) && /[A-Z]/.test(password),
         number: /\d/.test(password),
-        special: /[!@#$%^&*]/.test(password),
+        special: /[!@#$%^&*()_\-+=\[\]{};:'",.<>/?\\|~]/.test(password),
         notCommon: password.length > 0 && !COMMON_PASSWORDS.includes(lower)
     };
 };
 
 const determineStrength = (criteria) => {
     const score = Object.values(criteria).filter(Boolean).length;
-    if (!criteria.minLength || score <= 2) return { label: "Weak", percentage: 25 };
-    if (score === 3) return { label: "Fair", percentage: 50 };
-    if (score === 4 || score === 5) return { label: "Strong", percentage: 75 };
+    if (!criteria.minLength || score <= STRENGTH_THRESHOLDS.weak) return { label: "Weak", percentage: 25 };
+    if (score === STRENGTH_THRESHOLDS.fair) return { label: "Fair", percentage: 50 };
+    if (score <= STRENGTH_THRESHOLDS.strong) return { label: "Strong", percentage: 75 };
     return { label: "Very Strong", percentage: 100 };
 };
 
@@ -176,7 +181,7 @@ const updatePasswordStrengthUI = () => {
     const password = encryptPasswordInput.value || "";
     const criteria = evaluatePasswordCriteria(password);
     const { label, percentage } = determineStrength(criteria);
-    const labelClass = `strength-${label.toLowerCase().replace(" ", "-")}`;
+    const labelClass = `strength-${label.toLowerCase().replace(/\s+/g, "-")}`;
 
     strengthLabel.textContent = label;
     strengthLabel.className = `strength-text ${labelClass}`;
