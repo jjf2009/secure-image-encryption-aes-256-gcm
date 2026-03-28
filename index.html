@@ -219,6 +219,80 @@
             <div id="tamper-display" class="tamper-display" aria-live="polite"></div>
         </section>
 
+        <section class="card" id="round-visualizer-card" style="display: none;">
+            <div class="card-header">
+                <h2>Round-by-Round Diffusion Visualizer</h2>
+                <p>Watch how each AES round increases diffusion using S-box, ShiftRows, MixColumns, and AddRoundKey.</p>
+            </div>
+
+            <div id="round-loading" class="round-loading" aria-live="polite">
+                <div class="round-loading-bar">
+                    <div class="round-loading-progress" id="round-loading-progress" style="width: 0%;"></div>
+                </div>
+                <p class="helper-text" id="round-loading-text">Awaiting encryption...</p>
+            </div>
+
+            <div id="round-visualizer-body" class="round-visualizer-body" style="display: none;">
+                <div class="round-header">
+                    <div class="round-number" id="round-number">R0</div>
+                    <div class="round-title-block">
+                        <p class="round-title" id="round-title">Round 0 — Original Image</p>
+                        <div class="round-badges">
+                            <span class="round-badge" data-op="subbytes">SubBytes</span>
+                            <span class="round-badge" data-op="shiftrows">ShiftRows</span>
+                            <span class="round-badge" data-op="mixcolumns">MixColumns</span>
+                            <span class="round-badge" data-op="addroundkey">AddRoundKey</span>
+                        </div>
+                    </div>
+                    <div class="round-entropy">
+                        <p class="round-entropy-label">Entropy</p>
+                        <p class="round-entropy-value" id="round-entropy-value">—</p>
+                    </div>
+                </div>
+
+                <div class="round-controls">
+                    <div class="round-slider-block">
+                        <label for="round-range">Navigate Rounds (R0–R14)</label>
+                        <input type="range" id="round-range" min="0" max="14" value="0" step="1">
+                    </div>
+                    <div class="round-control-buttons">
+                        <button type="button" class="btn btn-secondary round-btn" id="round-prev">Prev</button>
+                        <button type="button" class="btn btn-secondary round-btn" id="round-play">Play</button>
+                        <button type="button" class="btn btn-secondary round-btn" id="round-next">Next</button>
+                    </div>
+                    <div class="round-current-label">
+                        <span class="round-pill" id="round-pill">R0</span>
+                        <span class="helper-text" id="round-play-helper">Auto-advance when playing</span>
+                    </div>
+                </div>
+
+                <div class="round-canvases">
+                    <div class="round-canvas-panel">
+                        <p class="compare-label">R0 — Original</p>
+                        <canvas id="round-original-canvas" class="compare-canvas" aria-label="Original image (R0)"></canvas>
+                    </div>
+                    <div class="round-canvas-panel">
+                        <p class="compare-label" id="round-current-label">R0 — Current</p>
+                        <canvas id="round-current-canvas" class="compare-canvas" aria-label="Current round image"></canvas>
+                    </div>
+                </div>
+
+                <div class="histogram-grid">
+                    <div class="histogram-panel">
+                        <p class="compare-label">Original Histogram</p>
+                        <canvas id="histogram-original" aria-label="Original histogram"></canvas>
+                    </div>
+                    <div class="histogram-panel">
+                        <p class="compare-label">Current Round Histogram</p>
+                        <canvas id="histogram-current" aria-label="Current round histogram"></canvas>
+                    </div>
+                    <p class="helper-text histogram-caption">Entropy Visualization — Clustered → Uniform = Secure</p>
+                </div>
+
+                <div class="round-filmstrip" id="round-filmstrip" aria-label="Round thumbnails filmstrip"></div>
+            </div>
+        </section>
+
         <p class="attack-explainer">AES-GCM uses an authentication tag to guarantee integrity. Even a single bit change in ciphertext causes decryption to fail — this is called authenticated encryption.</p>
 
         <footer>
