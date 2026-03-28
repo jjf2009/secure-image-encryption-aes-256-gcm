@@ -334,17 +334,20 @@ btnEncrypt.addEventListener('click', async () => {
         const arrayBuffer = await file.arrayBuffer();
         const encoder = new TextEncoder();
         const metadata = {
-            name: file.name || "image.bin",
+            name: file.name || "file.bin",
             type: file.type || "application/octet-stream",
             size: file.size
         };
         const metadataBytes = encoder.encode(JSON.stringify(metadata));
         const delimiterBytes = encoder.encode(METADATA_DELIMITER);
+        const metadataLengthBytes = new Uint8Array(4);
+        new DataView(metadataLengthBytes.buffer).setUint32(0, metadataBytes.length, true);
         const fileBytes = new Uint8Array(arrayBuffer);
-        const payload = new Uint8Array(metadataBytes.length + delimiterBytes.length + fileBytes.length);
-        payload.set(metadataBytes, 0);
-        payload.set(delimiterBytes, metadataBytes.length);
-        payload.set(fileBytes, metadataBytes.length + delimiterBytes.length);
+        const payload = new Uint8Array(metadataLengthBytes.length + metadataBytes.length + delimiterBytes.length + fileBytes.length);
+        payload.set(metadataLengthBytes, 0);
+        payload.set(metadataBytes, metadataLengthBytes.length);
+        payload.set(delimiterBytes, metadataLengthBytes.length + metadataBytes.length);
+        payload.set(fileBytes, metadataLengthBytes.length + metadataBytes.length + delimiterBytes.length);
 
         const iv = window.crypto.getRandomValues(new Uint8Array(12));
         const salt = window.crypto.getRandomValues(new Uint8Array(16));
@@ -470,51 +473,35 @@ btnDecrypt.addEventListener('click', async () => {
 
         const decryptedBytes = new Uint8Array(decryptedBuffer);
         const delimiterBytes = new TextEncoder().encode(METADATA_DELIMITER);
-        const findDelimiterIndexKMP = () => {
-            // Use Knuth–Morris–Pratt (KMP) to locate the delimiter efficiently within the decrypted bytes.
-            // The LPS (longest proper prefix that is also a suffix) table allows the search to skip ahead
-            // when partial matches fail, avoiding redundant comparisons.
-            const buildLPSTable = (pattern) => {
-                const table = new Array(pattern.length).fill(0);
-                let len = 0;
-                for (let i = 1; i < pattern.length; i++) {
-                    while (len > 0 && pattern[i] !== pattern[len]) {
-                        len = table[len - 1];
-                    }
-                    if (pattern[i] === pattern[len]) {
-                        len++;
-                        table[i] = len;
-                    }
-                }
-                return table;
-            };
+        const headerSize = 4;
+        if (decryptedBytes.length < headerSize + delimiterBytes.length) {
+            throw new Error("Metadata header missing or corrupted.");
+        }
 
-            const lps = buildLPSTable(delimiterBytes);
-            let textIndex = 0;
-            let patternIndex = 0;
-            while (textIndex < decryptedBytes.length) {
-                if (decryptedBytes[textIndex] === delimiterBytes[patternIndex]) {
-                    textIndex++;
-                    patternIndex++;
-                    if (patternIndex === delimiterBytes.length) {
-                        return textIndex - patternIndex;
-                    }
-                } else if (patternIndex !== 0) {
-                    patternIndex = lps[patternIndex - 1];
-                } else {
-                    textIndex++;
-                }
+        const metadataLength = new DataView(decryptedBytes.buffer, decryptedBytes.byteOffset, headerSize).getUint32(0, true);
+        const metadataStart = headerSize;
+        const metadataEnd = metadataStart + metadataLength;
+        const delimiterStart = metadataEnd;
+        const delimiterEnd = delimiterStart + delimiterBytes.length;
+
+        if (metadataLength <= 0 || delimiterEnd > decryptedBytes.length) {
+            throw new Error("Invalid metadata length.");
+        }
+
+        let delimiterValid = true;
+        for (let i = 0; i < delimiterBytes.length; i++) {
+            if (decryptedBytes[delimiterStart + i] !== delimiterBytes[i]) {
+                delimiterValid = false;
+                break;
             }
-            return -1;
-        };
+        }
 
-        const delimiterIndex = findDelimiterIndexKMP();
-        if (delimiterIndex < 0) {
+        if (!delimiterValid) {
             throw new Error("Metadata delimiter not found in decrypted payload.");
         }
 
-        const metadataBytes = decryptedBytes.slice(0, delimiterIndex);
-        const fileBytes = decryptedBytes.slice(delimiterIndex + delimiterBytes.length);
+        const metadataBytes = decryptedBytes.slice(metadataStart, metadataEnd);
+        const fileBytes = decryptedBytes.slice(delimiterEnd);
         const decoder = new TextDecoder();
 
         let metadata;
@@ -525,6 +512,8 @@ btnDecrypt.addEventListener('click', async () => {
         }
 
         const sanitizeFileName = (name) => {
+            const DEFAULT_NAME = "file.bin";
+            const MAX_LENGTH = 200;
             const warnAndStripPath = (value) => {
                 if (/[\\/]/.test(value)) {
                     console.warn("Embedded filename contained path separators; using last segment.");
@@ -534,20 +523,31 @@ btnDecrypt.addEventListener('click', async () => {
             const removeControlChars = (value) => value.replace(/[\x00-\x1F\x80-\x9F]/g, "");
             const replaceIllegalChars = (value) => value.replace(/[<>:"/\\|?*]/g, "_").trim();
             const ensureNonReservedName = (root, extension) => {
-                const adjustedRoot = RESERVED_FILENAMES.has(root.toUpperCase()) ? `${root}_file` : root;
-                return `${adjustedRoot}${extension}`.replace(/^\.+/, "") || "image.bin";
+                const upperRoot = root.toUpperCase();
+                const upperTrimmedRoot = (root.split(".")[0] || "").toUpperCase();
+                const needsAdjust = RESERVED_FILENAMES.has(upperRoot) || RESERVED_FILENAMES.has(upperTrimmedRoot);
+                const adjustedRoot = needsAdjust ? `${root}_file` : root;
+                return `${adjustedRoot}${extension}`.replace(/^\.+/, "") || DEFAULT_NAME;
+            };
+            const enforceMaxLength = (value) => {
+                if (value.length <= MAX_LENGTH) return value;
+                const lastDot = value.lastIndexOf(".");
+                const ext = lastDot >= 0 ? value.slice(lastDot) : "";
+                const base = lastDot >= 0 ? value.slice(0, lastDot) : value;
+                const trimmedBase = base.slice(0, Math.max(1, MAX_LENGTH - ext.length));
+                return `${trimmedBase}${ext}`;
             };
 
-            const originalName = name || "image.bin";
+            const originalName = name || DEFAULT_NAME;
             const base = warnAndStripPath(originalName);
             const withoutControl = removeControlChars(base);
             const cleaned = replaceIllegalChars(withoutControl);
             const stripped = cleaned.replace(/^\.+/, "").replace(/\.+$/, "");
-            const safeBase = stripped || "image";
+            const safeBase = stripped || "file";
             const dotIndex = safeBase.lastIndexOf(".");
             const nameRoot = dotIndex === -1 ? safeBase : safeBase.slice(0, dotIndex);
             const extension = dotIndex === -1 ? "" : safeBase.slice(dotIndex);
-            return ensureNonReservedName(nameRoot, extension);
+            return enforceMaxLength(ensureNonReservedName(nameRoot, extension)) || DEFAULT_NAME;
         };
 
         const safeName = sanitizeFileName(metadata?.name);
