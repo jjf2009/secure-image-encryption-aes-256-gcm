@@ -89,6 +89,60 @@
             </section>
         </main>
 
+        <section class="card" id="performance-card">
+            <div class="card-header">
+                <h2>Performance & Benchmarks</h2>
+                <p>Measure how long key derivation and encryption/decryption take for your files.</p>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-icon" aria-hidden="true">🧬</div>
+                    <div class="stat-text">
+                        <p class="stat-label">PBKDF2 Time</p>
+                        <p class="stat-value" id="stat-pbkdf2">—</p>
+                    </div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-icon" aria-hidden="true">🔒</div>
+                    <div class="stat-text">
+                        <p class="stat-label" id="stat-mode">Waiting for operation</p>
+                        <p class="stat-value" id="stat-operation">—</p>
+                    </div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-icon" aria-hidden="true">📦</div>
+                    <div class="stat-text">
+                        <p class="stat-label">File Size</p>
+                        <p class="stat-value" id="stat-filesize">—</p>
+                    </div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-icon" aria-hidden="true">🚀</div>
+                    <div class="stat-text">
+                        <p class="stat-label">Throughput</p>
+                        <p class="stat-value" id="stat-throughput">—</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="pbkdf2-warning" class="warning-box" role="status" aria-live="polite" style="display: none;">
+                ⚠️ Consider increasing iteration count for stronger brute-force resistance
+            </div>
+
+            <div class="benchmark-actions">
+                <button id="btn-benchmark" class="btn btn-secondary">
+                    <span class="spinner" id="benchmark-spinner"></span>
+                    <span>PBKDF2 Iteration Benchmark</span>
+                </button>
+                <div id="benchmark-status" class="status-box"></div>
+                <p class="helper-text">Higher iterations = slower brute force attacks but slower for legitimate users — this is the security/performance tradeoff.</p>
+                <div class="chart-wrapper">
+                    <canvas id="pbkdf2-chart" aria-label="PBKDF2 iteration benchmark chart"></canvas>
+                </div>
+            </div>
+        </section>
+
         <section class="card" id="comparison-card" style="display: none;">
             <div class="card-header">
                 <h2>Visual Comparison</h2>
@@ -136,6 +190,7 @@
         </footer>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
