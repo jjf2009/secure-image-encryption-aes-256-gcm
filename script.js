@@ -59,6 +59,19 @@ const btnEncrypt = document.getElementById('btn-encrypt');
 const btnDecrypt = document.getElementById('btn-decrypt');
 const btnDownloadTxt = document.getElementById('btn-download-txt');
 const btnDownloadImg = document.getElementById('btn-download-img');
+const encryptPasswordInput = document.getElementById('encrypt-password');
+const strengthBar = document.getElementById('password-strength-bar');
+const strengthLabel = document.getElementById('password-strength-label');
+const strengthWarning = document.getElementById('password-strength-warning');
+const specialCharHelp = document.getElementById('criteria-special-help');
+const criteriaCheckboxes = {
+    minLength: document.getElementById('criteria-length'),
+    longLength: document.getElementById('criteria-long'),
+    upperLower: document.getElementById('criteria-case'),
+    number: document.getElementById('criteria-number'),
+    special: document.getElementById('criteria-special'),
+    notCommon: document.getElementById('criteria-common')
+};
 const ciphertextOutput = document.getElementById('ciphertext-output');
 const btnSimulateAttack = document.getElementById('btn-simulate-attack');
 const attackStatus = document.getElementById('attack-status');
@@ -85,6 +98,8 @@ let encryptedBlobUrl = null;
 let decryptedBlobUrl = null;
 let lastEncryptedPayload = "";
 let lastEncryptionPassword = "";
+let encryptInProgress = false;
+let lastStrengthLevel = "weak";
 
 const METADATA_DELIMITER = "::SECUREIMAGE_METADATA::";
 const DEFAULT_FILE_NAME = "file.bin";
@@ -102,6 +117,51 @@ let pbkdf2Chart = null;
 let primaryColorCache = null;
 // Benchmark range includes a low iteration count for comparative timing only (not a security recommendation).
 const BENCHMARK_ITERATIONS = [10000, 50000, 100000, 200000, 500000];
+const COMMON_PASSWORDS = [
+    "123456", "password", "123456789", "12345678", "12345",
+    "111111", "qwerty", "abc123", "password1", "123123",
+    "iloveyou", "1q2w3e4r", "000000", "letmein", "dragon",
+    "sunshine", "princess", "monkey", "login", "password123"
+];
+const MIN_PASSWORD_LENGTH = 8;
+const STRONG_PASSWORD_LENGTH = 12;
+// Set of allowed special characters kept as an explicit list to avoid escape ambiguity.
+const SPECIAL_CHARACTERS = [
+    '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', '-', '=', '[',
+    ']', '{', '}', ';', ':', "'", '"', ',', '.', '<', '>', '/', '?', '\\', '|', '~', '`'
+];
+const SPECIAL_CHAR_SET = SPECIAL_CHARACTERS.join('');
+const SPECIAL_CHAR_DISPLAY = SPECIAL_CHARACTERS.join(', ');
+/**
+ * Escapes characters with special meaning inside regex character classes.
+ * Ensures the provided string can be embedded safely in a RegExp like /[...]/.
+ * Escapes backslash (escape), square brackets (class delimiters), caret (negation),
+ * and hyphen (range definition) which are the special tokens within [].
+ */
+const escapeForCharClass = (chars) => chars.replace(/[\\\[\]^-]/g, '\\$&');
+const SPECIAL_CHAR_PATTERN = new RegExp(`[${escapeForCharClass(SPECIAL_CHAR_SET)}]`);
+const STRENGTH_SCORE_MAX = {
+    weak: 2,
+    fair: 4,
+    strong: 5
+};
+const STRENGTH_PERCENTAGES = {
+    weak: 25,
+    fair: 50,
+    strong: 75,
+    veryStrong: 100
+};
+const STRENGTH_CLASSES = {
+    weak: "strength-weak",
+    fair: "strength-fair",
+    strong: "strength-strong",
+    veryStrong: "strength-very-strong"
+};
+const SPECIAL_CHAR_HELP_TEXT = `Special characters include: ${SPECIAL_CHAR_DISPLAY}`;
+
+if (specialCharHelp) {
+    specialCharHelp.textContent = SPECIAL_CHAR_HELP_TEXT;
+}
 
 const getPrimaryColor = () => {
     if (primaryColorCache) return primaryColorCache;
@@ -131,6 +191,65 @@ const toggleSpinner = (spinnerEl, show) => {
     if (!spinnerEl) return;
     spinnerEl.style.display = show ? "inline-block" : "none";
 };
+
+const evaluatePasswordCriteria = (password) => {
+    const lower = password.toLowerCase();
+    return {
+        minLength: password.length >= MIN_PASSWORD_LENGTH,
+        longLength: password.length >= STRONG_PASSWORD_LENGTH,
+        upperLower: /[a-z]/.test(password) && /[A-Z]/.test(password),
+        number: /\d/.test(password),
+        special: SPECIAL_CHAR_PATTERN.test(password),
+        notCommon: password.length > 0 && !COMMON_PASSWORDS.includes(lower)
+    };
+};
+
+const determineStrength = (criteria) => {
+    const metCriteriaCount = Object.values(criteria).filter(Boolean).length;
+    if (!criteria.minLength) return { level: "weak", label: "Weak", percentage: STRENGTH_PERCENTAGES.weak };
+    if (metCriteriaCount <= STRENGTH_SCORE_MAX.weak) return { level: "weak", label: "Weak", percentage: STRENGTH_PERCENTAGES.weak };
+    if (metCriteriaCount <= STRENGTH_SCORE_MAX.fair) return { level: "fair", label: "Fair", percentage: STRENGTH_PERCENTAGES.fair };
+    if (metCriteriaCount <= STRENGTH_SCORE_MAX.strong) return { level: "strong", label: "Strong", percentage: STRENGTH_PERCENTAGES.strong };
+    return { level: "veryStrong", label: "Very Strong", percentage: STRENGTH_PERCENTAGES.veryStrong };
+};
+
+const updatePasswordStrengthUI = () => {
+    if (!encryptPasswordInput || !strengthBar || !strengthLabel) return;
+    const password = encryptPasswordInput.value || "";
+    const criteria = evaluatePasswordCriteria(password);
+    const { level, label, percentage } = determineStrength(criteria);
+    const labelClass = STRENGTH_CLASSES[level];
+
+    if (level !== lastStrengthLevel) {
+        strengthLabel.textContent = label;
+        strengthLabel.className = `strength-text ${labelClass}`;
+    }
+
+    strengthBar.style.width = `${percentage}%`;
+    strengthBar.className = `strength-bar ${labelClass}`;
+
+    if (strengthWarning) {
+        strengthWarning.style.display = criteria.minLength ? "none" : "inline";
+        strengthWarning.textContent = criteria.minLength ? "" : `Minimum ${MIN_PASSWORD_LENGTH} characters required.`;
+    }
+
+    Object.entries(criteriaCheckboxes).forEach(([key, checkbox]) => {
+        if (!checkbox) return;
+        const met = Boolean(criteria[key]);
+        checkbox.checked = met;
+        const item = checkbox.closest('.criteria-item');
+        if (item) {
+            item.classList.toggle('met', met);
+        }
+    });
+
+    if (btnEncrypt) {
+        btnEncrypt.disabled = encryptInProgress || level === "weak";
+    }
+    lastStrengthLevel = level;
+};
+
+encryptPasswordInput?.addEventListener('input', updatePasswordStrengthUI);
 
 const formatBytes = (bytes) => {
     if (bytes === 0) return "0 B";
@@ -338,6 +457,8 @@ const renderComparisonPanel = async (file, ciphertextWithTagBytes) => {
     }
 };
 
+updatePasswordStrengthUI();
+
 // ENCRYPTION
 btnEncrypt.addEventListener('click', async () => {
     const fileInput = document.getElementById('image-upload');
@@ -352,6 +473,7 @@ btnEncrypt.addEventListener('click', async () => {
     }
 
     try {
+        encryptInProgress = true;
         btnEncrypt.disabled = true;
         spinner.style.display = "inline-block";
         status.style.display = "none";
@@ -440,8 +562,10 @@ btnEncrypt.addEventListener('click', async () => {
         }
         clearComparison();
     } finally {
-        btnEncrypt.disabled = false;
         spinner.style.display = "none";
+        updatePasswordStrengthUI();
+        encryptInProgress = false;
+        updatePasswordStrengthUI();
     }
 });
 

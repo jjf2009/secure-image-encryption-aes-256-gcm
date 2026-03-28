@@ -406,3 +406,92 @@ footer {
     border-radius: 12px;
     background: #ffffff;
 }
+
+.password-strength-block {
+    margin-top: 0.75rem;
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #f8fafc;
+}
+
+.strength-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.strength-text {
+    font-weight: 700;
+    font-size: 0.95rem;
+}
+
+.strength-warning {
+    font-size: 0.85rem;
+    color: var(--error);
+    display: inline;
+}
+
+.strength-meter {
+    position: relative;
+    width: 100%;
+    height: 10px;
+    background: #e5e7eb;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.strength-bar {
+    height: 100%;
+    width: 0;
+    border-radius: 999px;
+    transition: width 0.25s ease, background-color 0.25s ease;
+}
+
+.strength-weak {
+    color: var(--error);
+    background-color: #ef4444;
+}
+
+.strength-fair {
+    color: #ea580c;
+    background-color: #f97316;
+}
+
+.strength-strong {
+    color: #ca8a04;
+    background-color: #facc15;
+}
+
+.strength-very-strong {
+    color: var(--success);
+    background-color: var(--success);
+}
+
+.criteria-list {
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0.5rem 1rem;
+    margin-top: 0.75rem;
+}
+
+.criteria-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.criteria-item.met {
+    color: var(--text-main);
+    font-weight: 600;
+}
+
+.criteria-item input[type="checkbox"] {
+    pointer-events: none;
+    accent-color: var(--primary);
+}
