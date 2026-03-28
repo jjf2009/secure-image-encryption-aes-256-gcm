@@ -82,6 +82,7 @@ let lastEncryptionPassword = "";
 const FIXED_SALT = new TextEncoder().encode("SECUREIMAGE_SALT_PBKDF2");
 const BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
 let pbkdf2Chart = null;
+const PRIMARY_COLOR = (getComputedStyle(document.documentElement).getPropertyValue('--primary') || '#4f46e5').trim();
 
 const showStatus = (el, msg, isSuccess) => {
     el.textContent = isSuccess ? "Success: " + msg : "Error: " + msg;
@@ -95,16 +96,14 @@ const toggleSpinner = (spinnerEl, show) => {
 };
 
 const formatBytes = (bytes) => {
-    if (bytes < 0) return "0 KB";
-    if (bytes === 0) return "0 KB";
+    if (bytes <= 0) return "0 KB";
     const kb = bytes / 1024;
     if (kb < 1024) return `${kb.toFixed(1)} KB`;
     return `${(kb / 1024).toFixed(2)} MB`;
 };
 
 const computeThroughputMBps = (bytes, timeMs) => {
-    if (bytes <= 0) return 0;
-    if (timeMs <= 0) return null;
+    if (bytes <= 0 || timeMs <= 0) return 0;
     return (bytes / 1048576) / (timeMs / 1000);
 };
 
@@ -592,7 +591,7 @@ btnBenchmark?.addEventListener('click', async () => {
                     {
                         label: "PBKDF2 derivation time (ms)",
                         data: durations.map((v) => Number(v.toFixed(1))),
-                        borderColor: getComputedStyle(document.documentElement).getPropertyValue('--primary') || '#4f46e5',
+                        borderColor: PRIMARY_COLOR,
                         backgroundColor: 'rgba(79, 70, 229, 0.1)',
                         tension: 0.25,
                         fill: true,
