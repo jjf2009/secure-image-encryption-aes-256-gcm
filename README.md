@@ -9,8 +9,8 @@
 SecureImage is a fully client-side AES-256-GCM encryption system for images that never transmits data or keys to a server. It derives strong keys from user passphrases using PBKDF2 (SHA-256, 100,000 iterations) and produces a portable Base64 payload that embeds both ciphertext and metadata. Beyond encryption, it provides attack simulation, diffusion/entropy visualizations, and performance analytics to demonstrate cryptographic principles with measurable evidence.
 
 ## Live Demo
-[Deployment URL pending — replace with live demo link](https://your-demo-url.example)  
-*Note: Update this placeholder with the actual hosted URL.*
+[Live Demo (TODO: replace with deployment URL)](#)  
+*Note: This placeholder link should be updated once the project is hosted.*
 
 ## Feature Matrix
 
@@ -26,7 +26,7 @@ SecureImage is a fully client-side AES-256-GCM encryption system for images that
 | Embedded metadata | Original filename, MIME type, and size bundled inside ciphertext | ✅ |
 | Attack Simulation Panel | Bit-flip tampering demo with GCM integrity failure | ✅ |
 | Password strength validator | Real-time 4-level meter that blocks weak keys | ✅ |
-| Round-by-Round diffusion visualizer | AES-256 rounds visualized as R0–R14 states with S-box/ShiftRows/MixColumns/AddRoundKey | ✅ |
+| Round-by-Round diffusion visualizer | Captures initial state (R0) plus rounds 1–14 with S-box/ShiftRows/MixColumns/AddRoundKey | ✅ |
 | Entropy visualization panel | Original vs ciphertext noise + pixel histograms | ✅ |
 | Performance benchmarking | PBKDF2 time, encryption time, throughput, iteration sweep | ✅ |
 
@@ -58,7 +58,7 @@ Base64(SALT):Base64(IV):Base64(TAG):Base64(CIPHERTEXT)
 ## Visualization Features (What They Prove)
 
 - **Round-by-Round Diffusion Visualizer**  
-  Implements the real AES S-box, ShiftRows, MixColumns (GF(2^8)), and AddRoundKey to show how diffusion increases across AES-256’s 14 rounds (captured as R0–R14 states). The entropy score rises and histograms converge toward uniformity, evidencing the avalanche effect rather than mere visual obfuscation.
+  Implements the real AES S-box, ShiftRows, MixColumns (GF(2^8)), and AddRoundKey to show how diffusion increases across AES-256’s 14 rounds, with an explicit R0 snapshot of the initial state. The entropy score rises and histograms converge toward uniformity, evidencing the avalanche effect rather than mere visual obfuscation.
 
 - **Entropy Visualization Panel**  
   Renders ciphertext bytes as pixel noise side-by-side with the original image and plots per-channel histograms. This visually demonstrates loss of structure and near-uniform distribution expected from secure ciphertext.
