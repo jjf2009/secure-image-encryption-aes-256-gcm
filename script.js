@@ -129,7 +129,9 @@ const STRONG_PASSWORD_LENGTH = 12;
 const SPECIAL_CHARACTERS = [
     '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', '-', '=', '[',
     ']', '{', '}', ';', ':', "'", '"', ',', '.', '<', '>', '/', '?', '\\', '|', '~', '`'
-].join('');
+];
+const SPECIAL_CHAR_SET = SPECIAL_CHARACTERS.join('');
+const SPECIAL_CHAR_DISPLAY = SPECIAL_CHARACTERS.join(', ');
 /**
  * Escapes characters with special meaning inside regex character classes.
  * Ensures the provided string can be embedded safely in a RegExp like /[...]/.
@@ -137,7 +139,7 @@ const SPECIAL_CHARACTERS = [
  * and hyphen (range definition) which are the special tokens within [].
  */
 const escapeForCharClass = (chars) => chars.replace(/[\\\[\]\^-]/g, '\\$&');
-const SPECIAL_CHAR_PATTERN = new RegExp(`[${escapeForCharClass(SPECIAL_CHARACTERS)}]`);
+const SPECIAL_CHAR_PATTERN = new RegExp(`[${escapeForCharClass(SPECIAL_CHAR_SET)}]`);
 const STRENGTH_SCORE_MAX = {
     weak: 2,
     fair: 4,
@@ -155,7 +157,7 @@ const STRENGTH_CLASSES = {
     strong: "strength-strong",
     veryStrong: "strength-very-strong"
 };
-const SPECIAL_CHAR_HELP_TEXT = `Special characters include: ${SPECIAL_CHARACTERS}`;
+const SPECIAL_CHAR_HELP_TEXT = `Special characters include: ${SPECIAL_CHAR_DISPLAY}`;
 
 if (specialCharHelp) {
     specialCharHelp.textContent = SPECIAL_CHAR_HELP_TEXT;
@@ -561,7 +563,6 @@ btnEncrypt.addEventListener('click', async () => {
         clearComparison();
     } finally {
         encryptInProgress = false;
-        btnEncrypt.disabled = false;
         spinner.style.display = "none";
         updatePasswordStrengthUI();
     }
