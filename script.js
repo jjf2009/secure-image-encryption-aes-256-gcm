@@ -121,9 +121,11 @@ const COMMON_PASSWORDS = [
     "iloveyou", "1q2w3e4r", "000000", "letmein", "dragon",
     "sunshine", "princess", "monkey", "login", "password123"
 ];
-const STRENGTH_THRESHOLDS = {
+// Broad punctuation coverage for special-character detection.
+const SPECIAL_CHAR_PATTERN = /[!@#$%^&*()_\-+=\[\]{};:'",.<>/?\\|~]/;
+const STRENGTH_SCORE_MAX = {
     weak: 2,
-    fair: 3,
+    fair: 4,
     strong: 5
 };
 
@@ -163,16 +165,16 @@ const evaluatePasswordCriteria = (password) => {
         longLength: password.length >= 12,
         upperLower: /[a-z]/.test(password) && /[A-Z]/.test(password),
         number: /\d/.test(password),
-        special: /[!@#$%^&*()_\-+=\[\]{};:'",.<>/?\\|~]/.test(password),
+        special: SPECIAL_CHAR_PATTERN.test(password),
         notCommon: password.length > 0 && !COMMON_PASSWORDS.includes(lower)
     };
 };
 
 const determineStrength = (criteria) => {
     const score = Object.values(criteria).filter(Boolean).length;
-    if (!criteria.minLength || score <= STRENGTH_THRESHOLDS.weak) return { label: "Weak", percentage: 25 };
-    if (score === STRENGTH_THRESHOLDS.fair) return { label: "Fair", percentage: 50 };
-    if (score <= STRENGTH_THRESHOLDS.strong) return { label: "Strong", percentage: 75 };
+    if (!criteria.minLength || score <= STRENGTH_SCORE_MAX.weak) return { label: "Weak", percentage: 25 };
+    if (score <= STRENGTH_SCORE_MAX.fair) return { label: "Fair", percentage: 50 };
+    if (score <= STRENGTH_SCORE_MAX.strong) return { label: "Strong", percentage: 75 };
     return { label: "Very Strong", percentage: 100 };
 };
 
