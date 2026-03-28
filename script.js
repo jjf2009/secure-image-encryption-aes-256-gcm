@@ -91,6 +91,7 @@ const FIXED_SALT = new TextEncoder().encode("SECUREIMAGE_SALT_PBKDF2");
 const BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
 let pbkdf2Chart = null;
 let primaryColorCache = null;
+// Benchmark range includes a low iteration count for comparative timing only (not a security recommendation).
 const BENCHMARK_ITERATIONS = [10000, 50000, 100000, 200000, 500000];
 
 const getPrimaryColor = () => {
@@ -579,7 +580,6 @@ btnBenchmark?.addEventListener('click', async () => {
     if (!benchmarkChartCanvas) return;
     if (typeof Chart === "undefined") {
         showStatus(benchmarkStatus, "Chart.js library not available. Please check your internet connection or verify the CDN URL in index.html.", false);
-        btnBenchmark.disabled = true;
         return;
     }
 
