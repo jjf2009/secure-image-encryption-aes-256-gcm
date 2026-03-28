@@ -4,6 +4,7 @@
 
 // Key Derivation logic
 const PBKDF2_ITERATIONS = 100000;
+const PBKDF2_WARNING_THRESHOLD_MS = 200;
 
 const deriveKeyInternal = async (password, salt, iterations) => {
     const encoder = new TextEncoder();
@@ -122,7 +123,7 @@ const toggleSpinner = (spinnerEl, show) => {
 };
 
 const formatBytes = (bytes) => {
-    if (bytes === 0) return "0 KB";
+    if (bytes === 0) return "0 B";
     const kb = bytes / 1024;
     if (kb < 1024) return `${kb.toFixed(1)} KB`;
     return `${(kb / 1024).toFixed(2)} MB`;
@@ -143,7 +144,7 @@ const updateStatsPanel = ({ mode, pbkdf2Ms, operationMs, fileSizeBytes }) => {
     const throughput = computeThroughputMBps(fileSizeBytes, operationMs);
     statThroughput.textContent = throughput > 0 ? `${throughput.toFixed(2)} MB/s` : "—";
     if (pbkdf2Warning) {
-        pbkdf2Warning.style.display = pbkdf2Ms < 200 ? "block" : "none";
+        pbkdf2Warning.style.display = pbkdf2Ms < PBKDF2_WARNING_THRESHOLD_MS ? "block" : "none";
     }
 };
 
