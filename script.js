@@ -471,15 +471,35 @@ btnDecrypt.addEventListener('click', async () => {
         const decryptedBytes = new Uint8Array(decryptedBuffer);
         const delimiterBytes = new TextEncoder().encode(METADATA_DELIMITER);
         const findDelimiterIndex = () => {
-            let matchIndex = 0;
-            for (let i = 0; i < decryptedBytes.length; i++) {
-                if (decryptedBytes[i] === delimiterBytes[matchIndex]) {
-                    matchIndex++;
-                    if (matchIndex === delimiterBytes.length) {
-                        return i - delimiterBytes.length + 1;
+            const buildPrefixTable = (pattern) => {
+                const table = new Array(pattern.length).fill(0);
+                let len = 0;
+                for (let i = 1; i < pattern.length; i++) {
+                    while (len > 0 && pattern[i] !== pattern[len]) {
+                        len = table[len - 1];
                     }
+                    if (pattern[i] === pattern[len]) {
+                        len++;
+                        table[i] = len;
+                    }
+                }
+                return table;
+            };
+
+            const lps = buildPrefixTable(delimiterBytes);
+            let i = 0;
+            let j = 0;
+            while (i < decryptedBytes.length) {
+                if (decryptedBytes[i] === delimiterBytes[j]) {
+                    i++;
+                    j++;
+                    if (j === delimiterBytes.length) {
+                        return i - j;
+                    }
+                } else if (j !== 0) {
+                    j = lps[j - 1];
                 } else {
-                    matchIndex = decryptedBytes[i] === delimiterBytes[0] ? 1 : 0;
+                    i++;
                 }
             }
             return -1;
@@ -515,14 +535,19 @@ btnDecrypt.addEventListener('click', async () => {
             const nameRoot = dotIndex === -1 ? safeBase : safeBase.slice(0, dotIndex);
             const extension = dotIndex === -1 ? "" : safeBase.slice(dotIndex);
             const adjustedRoot = RESERVED_FILENAMES.has(nameRoot.toUpperCase()) ? `${nameRoot}_file` : nameRoot;
-            const finalName = `${adjustedRoot}${extension}`.replace(/^\.+/, "");
-            return finalName || "image.bin";
+            const candidateName = `${adjustedRoot}${extension}`.replace(/^\.+/, "");
+            const finalRoot = (candidateName.split(".")[0] || "").toUpperCase();
+            const safeFinal = RESERVED_FILENAMES.has(finalRoot) ? `${candidateName}_file` : candidateName;
+            return safeFinal || "image.bin";
         };
 
         const safeName = sanitizeFileName(metadata?.name);
         const actualSize = fileBytes.length;
         const parsedSize = Number(metadata?.size);
-        const reportedSize = Number.isNaN(parsedSize) ? null : (Number.isSafeInteger(parsedSize) && parsedSize >= 0 ? parsedSize : null);
+        let reportedSize = null;
+        if (!Number.isNaN(parsedSize) && Number.isSafeInteger(parsedSize) && parsedSize >= 0) {
+            reportedSize = parsedSize;
+        }
         const sizeMismatch = reportedSize !== null && reportedSize !== actualSize;
         if (sizeMismatch) {
             console.warn(`Embedded metadata size (${reportedSize}) did not match decrypted content size (${actualSize}). Using actual size.`);
