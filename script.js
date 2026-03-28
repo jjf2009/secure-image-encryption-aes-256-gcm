@@ -526,7 +526,11 @@ btnDecrypt.addEventListener('click', async () => {
         }
 
         const sanitizeFileName = (name) => {
-            const base = (name || "image.bin").split(/[\\/]/).pop();
+            const originalName = name || "image.bin";
+            if (/[\\/]/.test(originalName)) {
+                console.warn("Embedded filename contained path separators; using last segment.");
+            }
+            const base = originalName.split(/[\\/]/).pop();
             const withoutControl = base.replace(/[\x00-\x1F\x80-\x9F]/g, "");
             const cleaned = withoutControl.replace(/[<>:"/\\|?*]/g, "_").trim();
             const stripped = cleaned.replace(/^\.+/, "").replace(/\.+$/, "");
@@ -536,9 +540,7 @@ btnDecrypt.addEventListener('click', async () => {
             const extension = dotIndex === -1 ? "" : safeBase.slice(dotIndex);
             const adjustedRoot = RESERVED_FILENAMES.has(nameRoot.toUpperCase()) ? `${nameRoot}_file` : nameRoot;
             const candidateName = `${adjustedRoot}${extension}`.replace(/^\.+/, "");
-            const finalRoot = (candidateName.split(".")[0] || "").toUpperCase();
-            const safeFinal = RESERVED_FILENAMES.has(finalRoot) ? `${candidateName}_file` : candidateName;
-            return safeFinal || "image.bin";
+            return candidateName || "image.bin";
         };
 
         const safeName = sanitizeFileName(metadata?.name);
@@ -548,14 +550,14 @@ btnDecrypt.addEventListener('click', async () => {
         if (!Number.isNaN(parsedSize) && Number.isSafeInteger(parsedSize) && parsedSize >= 0) {
             reportedSize = parsedSize;
         }
-        const sizeMismatch = reportedSize !== null && reportedSize !== actualSize;
-        if (sizeMismatch) {
+        if (reportedSize !== null && reportedSize !== actualSize) {
             console.warn(`Embedded metadata size (${reportedSize}) did not match decrypted content size (${actualSize}). Using actual size.`);
         }
+        const normalizedSize = reportedSize !== null && reportedSize === actualSize ? reportedSize : actualSize;
         const normalizedMetadata = {
             name: safeName,
             type: metadata?.type || "application/octet-stream",
-            size: sizeMismatch ? actualSize : (reportedSize ?? actualSize)
+            size: normalizedSize
         };
 
         const blob = new Blob([fileBytes], { type: normalizedMetadata.type });
