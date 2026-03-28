@@ -523,9 +523,8 @@ btnDecrypt.addEventListener('click', async () => {
             const removeControlChars = (value) => value.replace(/[\x00-\x1F\x80-\x9F]/g, "");
             const replaceIllegalChars = (value) => value.replace(/[<>:"/\\|?*]/g, "_").trim();
             const ensureNonReservedName = (root, extension) => {
-                const upperRoot = root.toUpperCase();
-                const upperTrimmedRoot = (root.split(".")[0] || "").toUpperCase();
-                const needsAdjust = RESERVED_FILENAMES.has(upperRoot) || RESERVED_FILENAMES.has(upperTrimmedRoot);
+                const baseRoot = (root.split(".")[0] || root || "file").toUpperCase();
+                const needsAdjust = RESERVED_FILENAMES.has(baseRoot);
                 const adjustedRoot = needsAdjust ? `${root}_file` : root;
                 return `${adjustedRoot}${extension}`.replace(/^\.+/, "") || DEFAULT_NAME;
             };
@@ -543,17 +542,17 @@ btnDecrypt.addEventListener('click', async () => {
             const withoutControl = removeControlChars(base);
             const cleaned = replaceIllegalChars(withoutControl);
             const stripped = cleaned.replace(/^\.+/, "").replace(/\.+$/, "");
-            const safeBase = stripped || "file";
-            const dotIndex = safeBase.lastIndexOf(".");
-            const nameRoot = dotIndex === -1 ? safeBase : safeBase.slice(0, dotIndex);
-            const extension = dotIndex === -1 ? "" : safeBase.slice(dotIndex);
-            return enforceMaxLength(ensureNonReservedName(nameRoot, extension)) || DEFAULT_NAME;
+            const dotIndex = stripped.lastIndexOf(".");
+            const nameRoot = dotIndex === -1 ? (stripped || "file") : stripped.slice(0, dotIndex);
+            const extension = dotIndex === -1 ? "" : stripped.slice(dotIndex);
+            const normalized = ensureNonReservedName(nameRoot, extension) || DEFAULT_NAME;
+            return enforceMaxLength(normalized) || DEFAULT_NAME;
         };
 
         const safeName = sanitizeFileName(metadata?.name);
         const actualSize = fileBytes.length;
         const parsedSize = Number(metadata?.size);
-        const reportedSize = (!Number.isNaN(parsedSize) && Number.isSafeInteger(parsedSize) && parsedSize >= 0)
+        const reportedSize = (Number.isFinite(parsedSize) && Number.isSafeInteger(parsedSize) && parsedSize >= 0)
             ? parsedSize
             : null;
         if (reportedSize !== null && reportedSize !== actualSize) {
