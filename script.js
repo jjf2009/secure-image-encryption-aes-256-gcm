@@ -138,7 +138,7 @@ const SPECIAL_CHAR_DISPLAY = SPECIAL_CHARACTERS.join(', ');
  * Escapes backslash (escape), square brackets (class delimiters), caret (negation),
  * and hyphen (range definition) which are the special tokens within [].
  */
-const escapeForCharClass = (chars) => chars.replace(/[\\\[\]\^-]/g, '\\$&');
+const escapeForCharClass = (chars) => chars.replace(/[\\\[\]^-]/g, '\\$&');
 const SPECIAL_CHAR_PATTERN = new RegExp(`[${escapeForCharClass(SPECIAL_CHAR_SET)}]`);
 const STRENGTH_SCORE_MAX = {
     weak: 2,
@@ -205,11 +205,11 @@ const evaluatePasswordCriteria = (password) => {
 };
 
 const determineStrength = (criteria) => {
-    const score = Object.values(criteria).filter(Boolean).length;
+    const metCriteriaCount = Object.values(criteria).filter(Boolean).length;
     if (!criteria.minLength) return { level: "weak", label: "Weak", percentage: STRENGTH_PERCENTAGES.weak };
-    if (score <= STRENGTH_SCORE_MAX.weak) return { level: "weak", label: "Weak", percentage: STRENGTH_PERCENTAGES.weak };
-    if (score <= STRENGTH_SCORE_MAX.fair) return { level: "fair", label: "Fair", percentage: STRENGTH_PERCENTAGES.fair };
-    if (score <= STRENGTH_SCORE_MAX.strong) return { level: "strong", label: "Strong", percentage: STRENGTH_PERCENTAGES.strong };
+    if (metCriteriaCount <= STRENGTH_SCORE_MAX.weak) return { level: "weak", label: "Weak", percentage: STRENGTH_PERCENTAGES.weak };
+    if (metCriteriaCount <= STRENGTH_SCORE_MAX.fair) return { level: "fair", label: "Fair", percentage: STRENGTH_PERCENTAGES.fair };
+    if (metCriteriaCount <= STRENGTH_SCORE_MAX.strong) return { level: "strong", label: "Strong", percentage: STRENGTH_PERCENTAGES.strong };
     return { level: "veryStrong", label: "Very Strong", percentage: STRENGTH_PERCENTAGES.veryStrong };
 };
 
@@ -562,8 +562,9 @@ btnEncrypt.addEventListener('click', async () => {
         }
         clearComparison();
     } finally {
-        encryptInProgress = false;
         spinner.style.display = "none";
+        updatePasswordStrengthUI();
+        encryptInProgress = false;
         updatePasswordStrengthUI();
     }
 });
