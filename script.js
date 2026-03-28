@@ -123,7 +123,7 @@ const COMMON_PASSWORDS = [
 ];
 const MIN_PASSWORD_LENGTH = 8;
 const STRONG_PASSWORD_LENGTH = 12;
-// Broad punctuation coverage for special-character detection (includes !@#$%^&*()_+-=[]{};:'",.<>/?\|~`).
+// Broad punctuation coverage for special-character detection (e.g., !@#$%^&*()_+-=[]{};:'",.<>/?\|~ and the backtick `).
 const SPECIAL_CHAR_PATTERN = /[!@#$%^&*()_\-+=\[\]{};:'",.<>/?\\|~`]/;
 const STRENGTH_SCORE_MAX = {
     weak: 2,
@@ -135,6 +135,12 @@ const STRENGTH_PERCENTAGES = {
     fair: 50,
     strong: 75,
     veryStrong: 100
+};
+const STRENGTH_CLASSES = {
+    weak: "strength-weak",
+    fair: "strength-fair",
+    strong: "strength-strong",
+    veryStrong: "strength-very-strong"
 };
 
 const getPrimaryColor = () => {
@@ -180,19 +186,19 @@ const evaluatePasswordCriteria = (password) => {
 
 const determineStrength = (criteria) => {
     const score = Object.values(criteria).filter(Boolean).length;
-    if (!criteria.minLength) return { label: "Weak", percentage: STRENGTH_PERCENTAGES.weak };
-    if (score <= STRENGTH_SCORE_MAX.weak) return { label: "Weak", percentage: STRENGTH_PERCENTAGES.weak };
-    if (score <= STRENGTH_SCORE_MAX.fair) return { label: "Fair", percentage: STRENGTH_PERCENTAGES.fair };
-    if (score <= STRENGTH_SCORE_MAX.strong) return { label: "Strong", percentage: STRENGTH_PERCENTAGES.strong };
-    return { label: "Very Strong", percentage: STRENGTH_PERCENTAGES.veryStrong };
+    if (!criteria.minLength) return { level: "weak", label: "Weak", percentage: STRENGTH_PERCENTAGES.weak };
+    if (score <= STRENGTH_SCORE_MAX.weak) return { level: "weak", label: "Weak", percentage: STRENGTH_PERCENTAGES.weak };
+    if (score <= STRENGTH_SCORE_MAX.fair) return { level: "fair", label: "Fair", percentage: STRENGTH_PERCENTAGES.fair };
+    if (score <= STRENGTH_SCORE_MAX.strong) return { level: "strong", label: "Strong", percentage: STRENGTH_PERCENTAGES.strong };
+    return { level: "veryStrong", label: "Very Strong", percentage: STRENGTH_PERCENTAGES.veryStrong };
 };
 
 const updatePasswordStrengthUI = () => {
     if (!encryptPasswordInput || !strengthBar || !strengthLabel) return;
     const password = encryptPasswordInput.value || "";
     const criteria = evaluatePasswordCriteria(password);
-    const { label, percentage } = determineStrength(criteria);
-    const labelClass = `strength-${label.toLowerCase().replace(/\s+/g, "-")}`;
+    const { level, label, percentage } = determineStrength(criteria);
+    const labelClass = STRENGTH_CLASSES[level] || STRENGTH_CLASSES.weak;
 
     strengthLabel.textContent = label;
     strengthLabel.className = `strength-text ${labelClass}`;
@@ -216,7 +222,7 @@ const updatePasswordStrengthUI = () => {
     });
 
     if (btnEncrypt && !encryptInProgress) {
-        btnEncrypt.disabled = label === "Weak";
+        btnEncrypt.disabled = level === "weak";
     }
 };
 
