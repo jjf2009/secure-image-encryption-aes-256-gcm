@@ -85,6 +85,27 @@ const statOperation = document.getElementById('stat-operation');
 const statFileSize = document.getElementById('stat-filesize');
 const statThroughput = document.getElementById('stat-throughput');
 const pbkdf2Warning = document.getElementById('pbkdf2-warning');
+const roundCard = document.getElementById('round-visualizer-card');
+const roundLoading = document.getElementById('round-loading');
+const roundLoadingProgress = document.getElementById('round-loading-progress');
+const roundLoadingText = document.getElementById('round-loading-text');
+const roundVisualizerBody = document.getElementById('round-visualizer-body');
+const roundNumberEl = document.getElementById('round-number');
+const roundTitleEl = document.getElementById('round-title');
+const roundEntropyEl = document.getElementById('round-entropy-value');
+const roundRange = document.getElementById('round-range');
+const roundPrevBtn = document.getElementById('round-prev');
+const roundNextBtn = document.getElementById('round-next');
+const roundPlayBtn = document.getElementById('round-play');
+const roundPill = document.getElementById('round-pill');
+const roundPlayHelper = document.getElementById('round-play-helper');
+const roundCurrentCanvasLabel = document.getElementById('round-current-label');
+const roundBadges = document.querySelectorAll('.round-badge');
+const roundOriginalCanvas = document.getElementById('round-original-canvas');
+const roundCurrentCanvas = document.getElementById('round-current-canvas');
+const roundFilmstrip = document.getElementById('round-filmstrip');
+const histogramOriginalCanvas = document.getElementById('histogram-original');
+const histogramCurrentCanvas = document.getElementById('histogram-current');
 const btnBenchmark = document.getElementById('btn-benchmark');
 const benchmarkStatus = document.getElementById('benchmark-status');
 const benchmarkSpinner = document.getElementById('benchmark-spinner');
@@ -93,6 +114,29 @@ const MAX_CANVAS_DIMENSION = 420;
 const NOISE_SEED_SAMPLE_SIZE = 1024;
 const FNV_OFFSET_BASIS = 0x811c9dc5;
 const FNV_PRIME = 0x01000193;
+const VISUALIZER_MAX_DIMENSION = 280;
+const ROUND_STATES_TOTAL = 14;
+// 900ms provides time to observe diffusion changes while keeping playback engaging.
+const ROUND_PLAY_INTERVAL_MS = 900;
+const FILMSTRIP_THUMB_SIZE = 80;
+const AES_SBOX = new Uint8Array([
+    0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
+    0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0,
+    0xb7, 0xfd, 0x93, 0x26, 0x36, 0x3f, 0xf7, 0xcc, 0x34, 0xa5, 0xe5, 0xf1, 0x71, 0xd8, 0x31, 0x15,
+    0x04, 0xc7, 0x23, 0xc3, 0x18, 0x96, 0x05, 0x9a, 0x07, 0x12, 0x80, 0xe2, 0xeb, 0x27, 0xb2, 0x75,
+    0x09, 0x83, 0x2c, 0x1a, 0x1b, 0x6e, 0x5a, 0xa0, 0x52, 0x3b, 0xd6, 0xb3, 0x29, 0xe3, 0x2f, 0x84,
+    0x53, 0xd1, 0x00, 0xed, 0x20, 0xfc, 0xb1, 0x5b, 0x6a, 0xcb, 0xbe, 0x39, 0x4a, 0x4c, 0x58, 0xcf,
+    0xd0, 0xef, 0xaa, 0xfb, 0x43, 0x4d, 0x33, 0x85, 0x45, 0xf9, 0x02, 0x7f, 0x50, 0x3c, 0x9f, 0xa8,
+    0x51, 0xa3, 0x40, 0x8f, 0x92, 0x9d, 0x38, 0xf5, 0xbc, 0xb6, 0xda, 0x21, 0x10, 0xff, 0xf3, 0xd2,
+    0xcd, 0x0c, 0x13, 0xec, 0x5f, 0x97, 0x44, 0x17, 0xc4, 0xa7, 0x7e, 0x3d, 0x64, 0x5d, 0x19, 0x73,
+    0x60, 0x81, 0x4f, 0xdc, 0x22, 0x2a, 0x90, 0x88, 0x46, 0xee, 0xb8, 0x14, 0xde, 0x5e, 0x0b, 0xdb,
+    0xe0, 0x32, 0x3a, 0x0a, 0x49, 0x06, 0x24, 0x5c, 0xc2, 0xd3, 0xac, 0x62, 0x91, 0x95, 0xe4, 0x79,
+    0xe7, 0xc8, 0x37, 0x6d, 0x8d, 0xd5, 0x4e, 0xa9, 0x6c, 0x56, 0xf4, 0xea, 0x65, 0x7a, 0xae, 0x08,
+    0xba, 0x78, 0x25, 0x2e, 0x1c, 0xa6, 0xb4, 0xc6, 0xe8, 0xdd, 0x74, 0x1f, 0x4b, 0xbd, 0x8b, 0x8a,
+    0x70, 0x3e, 0xb5, 0x66, 0x48, 0x03, 0xf6, 0x0e, 0x61, 0x35, 0x57, 0xb9, 0x86, 0xc1, 0x1d, 0x9e,
+    0xe1, 0xf8, 0x98, 0x11, 0x69, 0xd9, 0x8e, 0x94, 0x9b, 0x1e, 0x87, 0xe9, 0xce, 0x55, 0x28, 0xdf,
+    0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16
+]);
 
 let encryptedBlobUrl = null;
 let decryptedBlobUrl = null;
@@ -100,6 +144,14 @@ let lastEncryptedPayload = "";
 let lastEncryptionPassword = "";
 let encryptInProgress = false;
 let lastStrengthLevel = "weak";
+let roundStates = [];
+let roundHistograms = [];
+let roundEntropies = [];
+let roundThumbRefs = [];
+let roundPlayTimer = null;
+let roundCurrentIndex = 0;
+let histogramOriginalChart = null;
+let histogramCurrentChart = null;
 
 const METADATA_DELIMITER = "::SECUREIMAGE_METADATA::";
 const DEFAULT_FILE_NAME = "file.bin";
@@ -112,6 +164,7 @@ const RESERVED_FILENAMES = new Set([
     "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
 ]);
 const FIXED_SALT = new TextEncoder().encode("SECUREIMAGE_SALT_PBKDF2");
+const SALT_BYTE_LENGTH = 16;
 const BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
 let pbkdf2Chart = null;
 let primaryColorCache = null;
@@ -158,6 +211,23 @@ const STRENGTH_CLASSES = {
     veryStrong: "strength-very-strong"
 };
 const SPECIAL_CHAR_HELP_TEXT = `Special characters include: ${SPECIAL_CHAR_DISPLAY}`;
+const ROUND_TITLES = [
+    "Round 0 — Original Image",
+    "Round 1 — Initial Confusion",
+    "Round 2 — S-Box Cascade",
+    "Round 3 — Shifted Strata",
+    "Round 4 — Heavy Diffusion",
+    "Round 5 — Avalanche Builds",
+    "Round 6 — Deep Mixing",
+    "Round 7 — Randomness Rising",
+    "Round 8 — Column Scramble",
+    "Round 9 — Cross-Byte Shuffle",
+    "Round 10 — Key Weave",
+    "Round 11 — Entropy Surge",
+    "Round 12 — Near-Uniform",
+    "Round 13 — Final Diffusion",
+    "Round 14 — Final Key Infusion"
+];
 
 if (specialCharHelp) {
     specialCharHelp.textContent = SPECIAL_CHAR_HELP_TEXT;
@@ -179,6 +249,13 @@ const colorWithAlpha = (color, alpha) => {
         return `rgba(${r}, ${g}, ${b}, ${alpha})`;
     }
     return `rgba(79, 70, 229, ${alpha})`;
+};
+
+const formatInterval = (ms) => {
+    const useSeconds = ms >= 1000;
+    const value = useSeconds ? (ms / 1000).toFixed(1) : ms;
+    const unit = useSeconds ? "s" : "ms";
+    return `${value}${unit}`;
 };
 
 const showStatus = (el, msg, isSuccess) => {
@@ -430,6 +507,418 @@ const drawEncryptedNoise = (bytes, targetWidth, targetHeight) => {
     ctx.putImageData(imageData, 0, 0);
 };
 
+const clampKeyBytes = (bytes) => {
+    if (!bytes) return new Uint8Array(32);
+    if (bytes.length === 32) return new Uint8Array(bytes);
+    if (bytes.length > 32) return new Uint8Array(bytes.slice(0, 32));
+    const padded = new Uint8Array(32);
+    padded.set(bytes);
+    return padded;
+};
+
+const deriveRoundKeys = (baseKeyBytes, rounds = ROUND_STATES_TOTAL) => {
+    const keys = [];
+    let prev = clampKeyBytes(baseKeyBytes);
+    for (let r = 1; r <= rounds; r++) {
+        const next = new Uint8Array(prev.length);
+        for (let i = 0; i < prev.length; i++) {
+            next[i] = AES_SBOX[prev[i]] ^ r;
+        }
+        keys.push(next);
+        prev = next;
+    }
+    return keys;
+};
+
+const xtime = (b) => {
+    const shifted = (b << 1) & 0xff;
+    return (b & 0x80) ? (shifted ^ 0x1b) : shifted;
+};
+
+const gmul3 = (b) => xtime(b) ^ b;
+
+const applySubBytes = (data) => {
+    const out = new Uint8ClampedArray(data.length);
+    for (let i = 0; i < data.length; i += 4) {
+        out[i] = AES_SBOX[data[i]];
+        out[i + 1] = AES_SBOX[data[i + 1]];
+        out[i + 2] = AES_SBOX[data[i + 2]];
+        out[i + 3] = data[i + 3];
+    }
+    return out;
+};
+
+const applyShiftRows = (data, width, height) => {
+    const out = new Uint8ClampedArray(data.length);
+    const rowStride = width * 4;
+    for (let y = 0; y < height; y++) {
+        const shift = y % 4;
+        for (let x = 0; x < width; x++) {
+            const destX = (x - shift + width) % width;
+            const srcIndex = (y * rowStride) + (x * 4);
+            const destIndex = (y * rowStride) + (destX * 4);
+            out[destIndex] = data[srcIndex];
+            out[destIndex + 1] = data[srcIndex + 1];
+            out[destIndex + 2] = data[srcIndex + 2];
+            out[destIndex + 3] = data[srcIndex + 3];
+        }
+    }
+    return out;
+};
+
+const applyMixColumns = (data, width, height) => {
+    const out = new Uint8ClampedArray(data.length);
+    const rowStride = width * 4;
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const srcIndex = (y * rowStride) + (x * 4);
+            const nextX = (x + 1) % width;
+            const nextIndex = (y * rowStride) + (nextX * 4);
+            out[srcIndex] = xtime(data[srcIndex]) ^ gmul3(data[nextIndex]);
+            out[srcIndex + 1] = xtime(data[srcIndex + 1]) ^ gmul3(data[nextIndex + 1]);
+            out[srcIndex + 2] = xtime(data[srcIndex + 2]) ^ gmul3(data[nextIndex + 2]);
+            out[srcIndex + 3] = data[srcIndex + 3];
+        }
+    }
+    return out;
+};
+
+const applyAddRoundKey = (data, roundKey) => {
+    const out = new Uint8ClampedArray(data.length);
+    let keyIndex = 0;
+    for (let i = 0; i < data.length; i++) {
+        if ((i % 4) === 3) {
+            out[i] = data[i];
+            continue;
+        }
+        out[i] = data[i] ^ roundKey[keyIndex % roundKey.length];
+        keyIndex++;
+    }
+    return out;
+};
+
+const histogramFromData = (data) => {
+    const histogram = new Uint32Array(256);
+    let total = 0;
+    for (let i = 0; i < data.length; i += 4) {
+        histogram[data[i]]++;
+        histogram[data[i + 1]]++;
+        histogram[data[i + 2]]++;
+        total += 3;
+    }
+    return { histogram: Array.from(histogram), total };
+};
+
+const entropyFromHistogram = ({ histogram, total }) => {
+    if (!total) return 0;
+    let entropy = 0;
+    for (let i = 0; i < histogram.length; i++) {
+        const count = histogram[i];
+        if (!count) continue;
+        const p = count / total;
+        entropy -= p * Math.log2(p);
+    }
+    return entropy;
+};
+
+const buildRoundStates = async (baseImageData, roundKeys, onProgress) => {
+    const states = [baseImageData];
+    const hist0 = histogramFromData(baseImageData.data);
+    const histograms = [hist0.histogram];
+    const entropies = [entropyFromHistogram(hist0)];
+    let prevData = baseImageData.data;
+
+    for (let r = 1; r <= ROUND_STATES_TOTAL; r++) {
+        if (typeof onProgress === "function") {
+            onProgress(r);
+        }
+        let working = applySubBytes(prevData);
+        working = applyShiftRows(working, baseImageData.width, baseImageData.height);
+        // Apply MixColumns for rounds 1–13 to mirror the AES round schedule for visualization; round 14 (final) omits it.
+        if (r !== ROUND_STATES_TOTAL) {
+            working = applyMixColumns(working, baseImageData.width, baseImageData.height);
+        }
+        working = applyAddRoundKey(working, roundKeys[r - 1]);
+        const imageData = new ImageData(working, baseImageData.width, baseImageData.height);
+        states.push(imageData);
+        const hist = histogramFromData(imageData.data);
+        histograms.push(hist.histogram);
+        entropies.push(entropyFromHistogram(hist));
+        prevData = imageData.data;
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+    }
+
+    return { states, histograms, entropies };
+};
+
+const computeVisualizerSize = (bitmap) => {
+    const maxSide = Math.max(bitmap.width, bitmap.height);
+    const scale = Math.min(1, VISUALIZER_MAX_DIMENSION / maxSide);
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+    return { width, height };
+};
+
+const drawImageDataToCanvas = (canvas, imageData) => {
+    if (!canvas || !imageData) return;
+    canvas.width = imageData.width;
+    canvas.height = imageData.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.putImageData(imageData, 0, 0);
+};
+
+const setRoundBadges = (roundIndex) => {
+    const ops = {
+        subbytes: roundIndex > 0,
+        shiftrows: roundIndex > 0,
+        mixcolumns: roundIndex > 0 && roundIndex < ROUND_STATES_TOTAL,
+        addroundkey: roundIndex > 0
+    };
+    roundBadges.forEach((badge) => {
+        const op = badge?.dataset?.op;
+        badge?.classList.toggle('active', Boolean(op && ops[op]));
+    });
+};
+
+const updateHistogramCharts = (roundIndex) => {
+    if (!histogramOriginalCanvas || !histogramCurrentCanvas) return;
+    const labels = Array.from({ length: 256 }, (_, i) => i);
+    const primary = getPrimaryColor();
+    if (typeof Chart === "undefined") return;
+
+    if (!histogramOriginalChart) {
+        histogramOriginalChart = new Chart(histogramOriginalCanvas.getContext('2d'), {
+            type: "bar",
+            data: {
+                labels,
+                datasets: [{
+                    label: "R0 Distribution",
+                    data: roundHistograms[0] || [],
+                    backgroundColor: colorWithAlpha(primary, 0.45),
+                    borderColor: primary,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { x: { display: false }, y: { display: false } },
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
+
+    if (!histogramCurrentChart) {
+        histogramCurrentChart = new Chart(histogramCurrentCanvas.getContext('2d'), {
+            type: "bar",
+            data: {
+                labels,
+                datasets: [{
+                    label: "Current Round",
+                    data: roundHistograms[roundIndex] || [],
+                    backgroundColor: colorWithAlpha(primary, 0.35),
+                    borderColor: primary,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { x: { display: false }, y: { display: false } },
+                plugins: { legend: { display: false } }
+            }
+        });
+    } else {
+        histogramCurrentChart.data.datasets[0].data = roundHistograms[roundIndex] || [];
+        histogramCurrentChart.update();
+    }
+};
+
+const highlightFilmstrip = (roundIndex) => {
+    roundThumbRefs.forEach((thumb, idx) => {
+        thumb.classList.toggle('active', idx === roundIndex);
+    });
+};
+
+const setRoundDisplay = (roundIndex) => {
+    if (!roundStates.length) return;
+    roundCurrentIndex = roundIndex;
+    const padded = roundIndex.toString().padStart(2, '0');
+    if (roundRange) roundRange.value = String(roundIndex);
+    if (roundNumberEl) roundNumberEl.textContent = padded;
+    if (roundTitleEl) roundTitleEl.textContent = ROUND_TITLES[roundIndex] || `Round ${roundIndex}`;
+    if (roundPill) roundPill.textContent = `R${padded}`;
+    if (roundCurrentCanvasLabel) roundCurrentCanvasLabel.textContent = `R${padded} — Current`;
+    if (roundEntropyEl && roundEntropies[roundIndex] !== undefined) {
+        roundEntropyEl.textContent = `${roundEntropies[roundIndex].toFixed(3)} bits`;
+    }
+
+    setRoundBadges(roundIndex);
+    drawImageDataToCanvas(roundCurrentCanvas, roundStates[roundIndex]);
+    updateHistogramCharts(roundIndex);
+    highlightFilmstrip(roundIndex);
+};
+
+const stopRoundPlayback = () => {
+    if (roundPlayTimer) {
+        clearInterval(roundPlayTimer);
+        roundPlayTimer = null;
+    }
+    if (roundPlayBtn) roundPlayBtn.textContent = "Play";
+};
+
+const buildFilmstrip = () => {
+    if (!roundFilmstrip) return;
+    roundFilmstrip.innerHTML = "";
+    roundThumbRefs = [];
+    roundStates.forEach((state, idx) => {
+        const thumb = document.createElement('canvas');
+        thumb.className = 'round-thumb';
+        const scale = Math.min(1, FILMSTRIP_THUMB_SIZE / Math.max(state.width, state.height));
+        thumb.width = Math.max(1, Math.round(state.width * scale));
+        thumb.height = Math.max(1, Math.round(state.height * scale));
+        const ctx = thumb.getContext('2d');
+        if (ctx) {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = state.width;
+            tempCanvas.height = state.height;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx?.putImageData(state, 0, 0);
+            ctx.drawImage(tempCanvas, 0, 0, thumb.width, thumb.height);
+        }
+        thumb.addEventListener('click', () => {
+            stopRoundPlayback();
+            setRoundDisplay(idx);
+        });
+        roundFilmstrip.appendChild(thumb);
+        roundThumbRefs.push(thumb);
+    });
+    highlightFilmstrip(roundCurrentIndex);
+};
+
+const resetRoundVisualizer = (message = "Awaiting encryption...") => {
+    stopRoundPlayback();
+    roundStates = [];
+    roundHistograms = [];
+    roundEntropies = [];
+    roundThumbRefs = [];
+    histogramOriginalChart?.destroy?.();
+    histogramCurrentChart?.destroy?.();
+    histogramOriginalChart = null;
+    histogramCurrentChart = null;
+    if (roundVisualizerBody) roundVisualizerBody.style.display = "none";
+    if (roundLoading) roundLoading.style.display = "block";
+    if (roundLoadingText) roundLoadingText.textContent = message;
+    if (roundLoadingProgress) roundLoadingProgress.style.width = "0%";
+    if (roundCard) roundCard.style.display = "none";
+};
+
+const startRoundPlayback = () => {
+    if (roundPlayTimer) {
+        stopRoundPlayback();
+        return;
+    }
+    if (roundPlayBtn) roundPlayBtn.textContent = "Pause";
+    roundPlayTimer = setInterval(() => {
+        const next = (roundCurrentIndex + 1) % (ROUND_STATES_TOTAL + 1);
+        setRoundDisplay(next);
+    }, ROUND_PLAY_INTERVAL_MS);
+};
+
+const handleRoundRangeChange = (event) => {
+    const value = Number(event.target?.value ?? 0);
+    stopRoundPlayback();
+    setRoundDisplay(Math.min(Math.max(0, value), ROUND_STATES_TOTAL));
+};
+
+const initializeRoundControls = () => {
+    if (roundPlayHelper) {
+        roundPlayHelper.textContent = `Auto-advance every ${formatInterval(ROUND_PLAY_INTERVAL_MS)} when playing`;
+    }
+    roundRange?.addEventListener('input', handleRoundRangeChange);
+    roundPrevBtn?.addEventListener('click', () => {
+        stopRoundPlayback();
+        const prev = roundCurrentIndex === 0 ? ROUND_STATES_TOTAL : roundCurrentIndex - 1;
+        setRoundDisplay(prev);
+    });
+    roundNextBtn?.addEventListener('click', () => {
+        stopRoundPlayback();
+        const next = (roundCurrentIndex + 1) % (ROUND_STATES_TOTAL + 1);
+        setRoundDisplay(next);
+    });
+    roundPlayBtn?.addEventListener('click', startRoundPlayback);
+};
+
+initializeRoundControls();
+
+const startRoundVisualizer = async (file, key, password, encryptionSalt) => {
+    if (!file || !roundCard) return;
+    resetRoundVisualizer("Computing rounds...");
+    roundCard.style.display = "block";
+
+    const updateProgress = (round) => {
+        const pct = Math.min(100, Math.round((round / ROUND_STATES_TOTAL) * 100));
+        if (roundLoadingProgress) roundLoadingProgress.style.width = `${pct}%`;
+        if (roundLoadingText) roundLoadingText.textContent = `Computing round ${round} of ${ROUND_STATES_TOTAL}...`;
+    };
+
+    let bitmap;
+    try {
+        bitmap = await createImageBitmap(file);
+    } catch (err) {
+        console.warn("Visualizer image decode failed.", err);
+        resetRoundVisualizer("Image decode failed for visualizer.");
+        return;
+    }
+
+    const { width, height } = computeVisualizerSize(bitmap);
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = width;
+    tempCanvas.height = height;
+    const ctx = tempCanvas.getContext('2d');
+    if (!ctx) {
+        resetRoundVisualizer("Canvas context unavailable.");
+        return;
+    }
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    const baseImageData = ctx.getImageData(0, 0, width, height);
+
+    let baseKeyBytes;
+    try {
+        if (key) {
+            const raw = await window.crypto.subtle.exportKey('raw', key);
+            baseKeyBytes = new Uint8Array(raw);
+        } else {
+            const saltBytes = encryptionSalt ? new Uint8Array(encryptionSalt) : window.crypto.getRandomValues(new Uint8Array(SALT_BYTE_LENGTH));
+            // Visualization-only derivation mirrors PBKDF2 flow.
+            // Use the encryption salt when available, or a fresh random salt — avoiding any hardcoded fixed salt.
+            // Non-deterministic previews are acceptable for this educational visualization.
+            const derivedKey = await deriveKeyWithIterations(password || "", saltBytes);
+            const rawDerived = await window.crypto.subtle.exportKey('raw', derivedKey);
+            baseKeyBytes = new Uint8Array(rawDerived);
+        }
+    } catch (err) {
+        console.warn("Visualizer key derivation failed.", err);
+        baseKeyBytes = new Uint8Array(32);
+    }
+
+    const roundKeys = deriveRoundKeys(baseKeyBytes, ROUND_STATES_TOTAL);
+    const { states, histograms, entropies } = await buildRoundStates(baseImageData, roundKeys, updateProgress);
+
+    roundStates = states;
+    roundHistograms = histograms;
+    roundEntropies = entropies;
+
+    drawImageDataToCanvas(roundOriginalCanvas, states[0]);
+    drawImageDataToCanvas(roundCurrentCanvas, states[0]);
+    buildFilmstrip();
+    setRoundDisplay(0);
+
+    if (roundLoading) roundLoading.style.display = "none";
+    if (roundVisualizerBody) roundVisualizerBody.style.display = "flex";
+};
+
 const renderComparisonPanel = async (file, ciphertextWithTagBytes) => {
     if (!comparisonCard || !file || !ciphertextWithTagBytes?.length) return;
 
@@ -473,6 +962,7 @@ btnEncrypt.addEventListener('click', async () => {
     }
 
     try {
+        resetRoundVisualizer("Preparing visualizer...");
         encryptInProgress = true;
         btnEncrypt.disabled = true;
         spinner.style.display = "inline-block";
@@ -500,7 +990,7 @@ btnEncrypt.addEventListener('click', async () => {
         payload.set(fileBytes, metadataLengthBytes.length + metadataBytes.length + delimiterBytes.length);
 
         const iv = window.crypto.getRandomValues(new Uint8Array(12));
-        const salt = window.crypto.getRandomValues(new Uint8Array(16));
+        const salt = window.crypto.getRandomValues(new Uint8Array(SALT_BYTE_LENGTH));
         const { key, duration: pbkdf2Ms } = await deriveKeyWithTiming(password, salt);
 
         const { data: encryptedData, duration: encryptionMs } = await encryptWithTiming(
@@ -550,6 +1040,7 @@ btnEncrypt.addEventListener('click', async () => {
         }
 
         await renderComparisonPanel(file, ciphertextWithTag);
+        await startRoundVisualizer(file, key, password, salt);
 
     } catch (e) {
         console.error(e);
@@ -561,6 +1052,7 @@ btnEncrypt.addEventListener('click', async () => {
             ciphertextOutput.value = "";
         }
         clearComparison();
+        resetRoundVisualizer("Visualizer unavailable.");
     } finally {
         spinner.style.display = "none";
         updatePasswordStrengthUI();
@@ -817,7 +1309,7 @@ btnBenchmark?.addEventListener('click', async () => {
 
     try {
         for (const iterationCount of BENCHMARK_ITERATIONS) {
-            const salt = window.crypto.getRandomValues(new Uint8Array(16));
+            const salt = window.crypto.getRandomValues(new Uint8Array(SALT_BYTE_LENGTH));
             const { duration } = await deriveKeyWithTiming("benchmark-password", salt, iterationCount);
             durations.push(duration);
         }
