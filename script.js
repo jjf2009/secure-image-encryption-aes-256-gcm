@@ -87,6 +87,11 @@ let lastEncryptedPayload = "";
 let lastEncryptionPassword = "";
 
 const METADATA_DELIMITER = "::SECUREIMAGE_METADATA::";
+const RESERVED_FILENAMES = new Set([
+    "CON", "PRN", "AUX", "NUL",
+    "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+    "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
+]);
 const FIXED_SALT = new TextEncoder().encode("SECUREIMAGE_SALT_PBKDF2");
 const BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
 let pbkdf2Chart = null;
@@ -466,9 +471,8 @@ btnDecrypt.addEventListener('click', async () => {
         const decryptedBytes = new Uint8Array(decryptedBuffer);
         const delimiterBytes = new TextEncoder().encode(METADATA_DELIMITER);
         const findDelimiterIndex = () => {
-            const searchLength = decryptedBytes.length;
             let matchIndex = 0;
-            for (let i = 0; i < searchLength; i++) {
+            for (let i = 0; i < decryptedBytes.length; i++) {
                 if (decryptedBytes[i] === delimiterBytes[matchIndex]) {
                     matchIndex++;
                     if (matchIndex === delimiterBytes.length) {
@@ -510,8 +514,7 @@ btnDecrypt.addEventListener('click', async () => {
             const dotIndex = safeBase.lastIndexOf(".");
             const nameRoot = dotIndex === -1 ? safeBase : safeBase.slice(0, dotIndex);
             const extension = dotIndex === -1 ? "" : safeBase.slice(dotIndex);
-            const reservedNames = new Set(["CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"]);
-            const adjustedRoot = reservedNames.has(nameRoot.toUpperCase()) ? `${nameRoot}_file` : nameRoot;
+            const adjustedRoot = RESERVED_FILENAMES.has(nameRoot.toUpperCase()) ? `${nameRoot}_file` : nameRoot;
             const finalName = `${adjustedRoot}${extension}`.replace(/^\.+/, "");
             return finalName || "image.bin";
         };
@@ -519,7 +522,7 @@ btnDecrypt.addEventListener('click', async () => {
         const safeName = sanitizeFileName(metadata?.name);
         const actualSize = fileBytes.length;
         const parsedSize = Number(metadata?.size);
-        const reportedSize = Number.isSafeInteger(parsedSize) && parsedSize >= 0 ? parsedSize : null;
+        const reportedSize = Number.isNaN(parsedSize) ? null : (Number.isSafeInteger(parsedSize) && parsedSize >= 0 ? parsedSize : null);
         const sizeMismatch = reportedSize !== null && reportedSize !== actualSize;
         if (sizeMismatch) {
             console.warn(`Embedded metadata size (${reportedSize}) did not match decrypted content size (${actualSize}). Using actual size.`);
