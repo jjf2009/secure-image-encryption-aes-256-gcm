@@ -83,10 +83,19 @@ const FNV_PRIME = 0x01000193;
 
 let encryptedBlobUrl = null;
 let decryptedBlobUrl = null;
-let originalFileName = "image.png";
 let lastEncryptedPayload = "";
 let lastEncryptionPassword = "";
 
+const METADATA_DELIMITER = "::SECUREIMAGE_METADATA::";
+const DEFAULT_FILE_NAME = "file.bin";
+const MAX_FILENAME_LENGTH = 200;
+const MAX_METADATA_SIZE = 10 * 1024; // 10 KB
+const MAX_FILESIZE_BYTES = 200 * 1024 * 1024; // 200 MB ceiling
+const RESERVED_FILENAMES = new Set([
+    "CON", "PRN", "AUX", "NUL",
+    "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+    "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
+]);
 const FIXED_SALT = new TextEncoder().encode("SECUREIMAGE_SALT_PBKDF2");
 const BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
 let pbkdf2Chart = null;
@@ -133,6 +142,30 @@ const formatBytes = (bytes) => {
 const computeThroughputMBps = (bytes, timeMs) => {
     if (bytes <= 0 || timeMs <= 0) return 0;
     return (bytes / 1048576) / (timeMs / 1000);
+};
+
+const sanitizeFileName = (name) => {
+    const originalName = name || DEFAULT_FILE_NAME;
+    if (/[\\/]/.test(originalName)) {
+        console.warn("Embedded filename contained path separators; using last segment.");
+    }
+    const base = originalName.split(/[\\/]/).pop();
+    const withoutControl = base.replace(/[\x00-\x1F\x80-\x9F]/g, "");
+    const cleaned = withoutControl.replace(/[<>:"/\\|?*]/g, "_").trim();
+    const stripped = cleaned.replace(/^\.+/, "").replace(/\.+$/, "");
+    const dotIndex = stripped.lastIndexOf(".");
+    const nameRoot = dotIndex === -1 ? (stripped || "file") : stripped.slice(0, dotIndex);
+    const extension = dotIndex === -1 ? "" : stripped.slice(dotIndex);
+    const baseRoot = (nameRoot.split(".")[0] || "file").toUpperCase();
+    const needsAdjust = RESERVED_FILENAMES.has(baseRoot);
+    const adjustedRoot = needsAdjust ? `${nameRoot}_file` : nameRoot;
+    const candidate = `${adjustedRoot}${extension}`.replace(/^\.+/, "") || DEFAULT_FILE_NAME;
+    if (candidate.length <= MAX_FILENAME_LENGTH) return candidate;
+    const lastDot = candidate.lastIndexOf(".");
+    const ext = lastDot >= 0 ? candidate.slice(lastDot) : "";
+    const baseTruncated = lastDot >= 0 ? candidate.slice(0, lastDot) : candidate;
+    const trimmedBase = baseTruncated.slice(0, Math.max(1, MAX_FILENAME_LENGTH - ext.length));
+    return `${trimmedBase}${ext}`;
 };
 
 const updateStatsPanel = ({ mode, pbkdf2Ms, operationMs, fileSizeBytes }) => {
@@ -326,8 +359,23 @@ btnEncrypt.addEventListener('click', async () => {
         clearComparison();
 
         const file = fileInput.files[0];
-        originalFileName = file.name;
         const arrayBuffer = await file.arrayBuffer();
+        const encoder = new TextEncoder();
+        const metadata = {
+            name: file.name || "file.bin",
+            type: file.type || "application/octet-stream",
+            size: file.size
+        };
+        const metadataBytes = encoder.encode(JSON.stringify(metadata));
+        const delimiterBytes = encoder.encode(METADATA_DELIMITER);
+        const metadataLengthBytes = new Uint8Array(4);
+        new DataView(metadataLengthBytes.buffer).setUint32(0, metadataBytes.length, true);
+        const fileBytes = new Uint8Array(arrayBuffer);
+        const payload = new Uint8Array(metadataLengthBytes.length + metadataBytes.length + delimiterBytes.length + fileBytes.length);
+        payload.set(metadataLengthBytes, 0);
+        payload.set(metadataBytes, metadataLengthBytes.length);
+        payload.set(delimiterBytes, metadataLengthBytes.length + metadataBytes.length);
+        payload.set(fileBytes, metadataLengthBytes.length + metadataBytes.length + delimiterBytes.length);
 
         const iv = window.crypto.getRandomValues(new Uint8Array(12));
         const salt = window.crypto.getRandomValues(new Uint8Array(16));
@@ -336,7 +384,7 @@ btnEncrypt.addEventListener('click', async () => {
         const { data: encryptedData, duration: encryptionMs } = await encryptWithTiming(
             key,
             iv,
-            arrayBuffer
+            payload
         );
 
         const tagSize = 16;
@@ -365,7 +413,7 @@ btnEncrypt.addEventListener('click', async () => {
             mode: "Encryption",
             pbkdf2Ms,
             operationMs: encryptionMs,
-            fileSizeBytes: arrayBuffer.byteLength
+            fileSizeBytes: metadata.size
         });
 
         // Attack simulator priming
@@ -451,24 +499,78 @@ btnDecrypt.addEventListener('click', async () => {
             ciphertextWithTag
         );
 
-        const blob = new Blob([decryptedBuffer]);
+        const decryptedBytes = new Uint8Array(decryptedBuffer);
+        const delimiterBytes = new TextEncoder().encode(METADATA_DELIMITER);
+        const headerSize = 4;
+        if (decryptedBytes.length < headerSize + delimiterBytes.length) {
+            throw new Error("Metadata header missing or corrupted.");
+        }
+
+        const metadataLength = new DataView(decryptedBytes.buffer, decryptedBytes.byteOffset, headerSize).getUint32(0, true);
+        const metadataStart = headerSize;
+        const metadataEnd = metadataStart + metadataLength;
+        const delimiterStart = metadataEnd;
+        const delimiterEnd = delimiterStart + delimiterBytes.length;
+
+        if (metadataLength < 0 || metadataLength > MAX_METADATA_SIZE || delimiterEnd > decryptedBytes.length) {
+            throw new Error("Invalid metadata length.");
+        }
+
+        const delimiterSegment = decryptedBytes.subarray(delimiterStart, delimiterEnd);
+        const delimiterValid = delimiterSegment.length === delimiterBytes.length &&
+            delimiterBytes.every((byte, idx) => delimiterSegment[idx] === byte);
+        if (!delimiterValid) {
+            throw new Error("Metadata delimiter not found in decrypted payload.");
+        }
+
+        const metadataBytes = decryptedBytes.slice(metadataStart, metadataEnd);
+        const fileBytes = decryptedBytes.slice(delimiterEnd);
+        const decoder = new TextDecoder();
+
+        let metadata;
+        try {
+            metadata = JSON.parse(decoder.decode(metadataBytes));
+        } catch (err) {
+            throw new Error("Failed to parse embedded metadata.");
+        }
+
+        const safeName = sanitizeFileName(metadata?.name);
+        const actualSize = fileBytes.length;
+        const parsedSize = Number(metadata?.size);
+        const reportedSize = (Number.isFinite(parsedSize) && Number.isInteger(parsedSize) && parsedSize >= 0 && parsedSize <= MAX_FILESIZE_BYTES)
+            ? parsedSize
+            : null;
+        if (reportedSize !== null && reportedSize !== actualSize) {
+            console.warn(`Embedded metadata size (${reportedSize}) did not match decrypted content size (${actualSize}). Using actual size.`);
+        }
+        const normalizedSize = reportedSize !== null && reportedSize === actualSize ? reportedSize : actualSize;
+        const normalizedMetadata = {
+            name: safeName,
+            type: metadata?.type || "application/octet-stream",
+            size: normalizedSize
+        };
+
+        const blob = new Blob([fileBytes], { type: normalizedMetadata.type });
         if (decryptedBlobUrl) URL.revokeObjectURL(decryptedBlobUrl);
         decryptedBlobUrl = URL.createObjectURL(blob);
 
         // Set attributes for native download link
-        const fileName = originalFileName.includes('.') ? originalFileName : "image.png";
         btnDownloadImg.href = decryptedBlobUrl;
-        btnDownloadImg.download = "restored_" + fileName;
+        btnDownloadImg.download = "restored_" + normalizedMetadata.name;
 
         previewImg.src = decryptedBlobUrl;
         previewArea.style.display = "block";
         btnDownloadImg.style.display = "inline-flex";
-        showStatus(status, "Decryption complete.", true);
+        showStatus(
+            status,
+            `Decryption complete. File: ${normalizedMetadata.name} (${normalizedMetadata.type}, ${formatBytes(normalizedMetadata.size)})`,
+            true
+        );
         updateStatsPanel({
             mode: "Decryption",
             pbkdf2Ms,
             operationMs: decryptionMs,
-            fileSizeBytes: decryptedBuffer.byteLength
+            fileSizeBytes: normalizedMetadata.size
         });
 
     } catch (e) {
