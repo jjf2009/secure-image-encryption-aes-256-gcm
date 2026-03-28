@@ -95,25 +95,28 @@ const toggleSpinner = (spinnerEl, show) => {
 };
 
 const formatBytes = (bytes) => {
-    if (!bytes || bytes <= 0) return "0 KB";
+    if (bytes < 0) return "0 KB";
+    if (bytes === 0) return "0 KB";
     const kb = bytes / 1024;
     if (kb < 1024) return `${kb.toFixed(1)} KB`;
     return `${(kb / 1024).toFixed(2)} MB`;
 };
 
 const computeThroughputMBps = (bytes, timeMs) => {
-    if (!bytes || timeMs <= 0) return 0;
+    if (bytes <= 0) return 0;
+    if (timeMs <= 0) return null;
     return (bytes / 1048576) / (timeMs / 1000);
 };
 
 const updateStatsPanel = ({ mode, pbkdf2Ms, operationMs, fileSizeBytes }) => {
     if (!statMode || !statPbkdf2 || !statOperation || !statFileSize || !statThroughput) return;
-    statMode.textContent = `Last ${mode}`;
+    const safeMode = mode || "Operation";
+    statMode.textContent = `Last ${safeMode}`;
     statPbkdf2.textContent = `${pbkdf2Ms.toFixed(1)} ms`;
     statOperation.textContent = `${operationMs.toFixed(1)} ms`;
     statFileSize.textContent = formatBytes(fileSizeBytes);
     const throughput = computeThroughputMBps(fileSizeBytes, operationMs);
-    statThroughput.textContent = throughput ? `${throughput.toFixed(2)} MB/s` : "—";
+    statThroughput.textContent = typeof throughput === "number" ? `${throughput.toFixed(2)} MB/s` : "—";
     if (pbkdf2Warning) {
         pbkdf2Warning.style.display = pbkdf2Ms < 200 ? "block" : "none";
     }
@@ -604,7 +607,7 @@ btnBenchmark?.addEventListener('click', async () => {
                 plugins: {
                     title: {
                         display: true,
-                        text: "Higher iterations = slower brute force attacks but slower for legitimate users — this is the security/performance tradeoff."
+                        text: "PBKDF2 iteration benchmark (ms)"
                     },
                     legend: {
                         display: false
