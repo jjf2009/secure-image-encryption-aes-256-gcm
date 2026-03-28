@@ -3,7 +3,9 @@
  */
 
 // Key Derivation logic
-const deriveKey = async (password, salt, iterations = 100000) => {
+const PBKDF2_ITERATIONS = 100000;
+
+const deriveKeyInternal = async (password, salt, iterations) => {
     const encoder = new TextEncoder();
     const passwordKey = await window.crypto.subtle.importKey(
         "raw",
@@ -26,6 +28,11 @@ const deriveKey = async (password, salt, iterations = 100000) => {
         ["encrypt", "decrypt"]
     );
 };
+
+const deriveKey = (password, salt) => deriveKeyInternal(password, salt, PBKDF2_ITERATIONS);
+
+const deriveKeyWithIterations = (password, salt, iterations = PBKDF2_ITERATIONS) =>
+    deriveKeyInternal(password, salt, iterations);
 
 // Base64 helpers
 const arrayBufferToBase64 = (buffer) => {
@@ -146,8 +153,10 @@ const withTiming = async (operation) => {
     return { data, duration: performance.now() - start };
 };
 
-const deriveKeyWithTiming = async (password, salt, iterations = 100000) =>
-    withTiming(() => deriveKey(password, salt, iterations));
+const deriveKeyWithTiming = async (password, salt, iterations = PBKDF2_ITERATIONS) => {
+    const { data, duration } = await withTiming(() => deriveKeyWithIterations(password, salt, iterations));
+    return { key: data, duration };
+};
 
 const encryptWithTiming = async (key, iv, dataBuffer) =>
     withTiming(() => window.crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, key, dataBuffer));
