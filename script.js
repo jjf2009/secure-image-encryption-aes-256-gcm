@@ -329,7 +329,7 @@ btnEncrypt.addEventListener('click', async () => {
         const arrayBuffer = await file.arrayBuffer();
         const encoder = new TextEncoder();
         const metadata = {
-            name: file.name || "image",
+            name: file.name || "image.bin",
             type: file.type || "application/octet-stream",
             size: file.size
         };
@@ -466,8 +466,9 @@ btnDecrypt.addEventListener('click', async () => {
         const decryptedBytes = new Uint8Array(decryptedBuffer);
         const delimiterBytes = new TextEncoder().encode(METADATA_DELIMITER);
         const findDelimiterIndex = () => {
+            const searchLength = Math.min(decryptedBytes.length, Math.max(4096, delimiterBytes.length));
             let matchIndex = 0;
-            for (let i = 0; i < decryptedBytes.length; i++) {
+            for (let i = 0; i < searchLength; i++) {
                 if (decryptedBytes[i] === delimiterBytes[matchIndex]) {
                     matchIndex++;
                     if (matchIndex === delimiterBytes.length) {
@@ -500,14 +501,22 @@ btnDecrypt.addEventListener('click', async () => {
             throw new Error("Decrypted file content missing.");
         }
 
+        const sanitizeFileName = (name) => {
+            const base = (name || "image.bin").split(/[\\/]/).pop();
+            const cleaned = base.replace(/[<>:"/\\|?*\x00-\x1F]/g, "_").trim();
+            const stripped = cleaned.replace(/^\.+/, "").replace(/\.+$/, "");
+            return stripped || "image.bin";
+        };
+
+        const safeName = sanitizeFileName(metadata?.name);
         const actualSize = fileBytes.length;
-        const reportedSize = Number.isFinite(metadata?.size) ? metadata.size : null;
+        const reportedSize = Number.isSafeInteger(metadata?.size) && metadata.size >= 0 ? metadata.size : null;
         const sizeMismatch = reportedSize !== null && reportedSize !== actualSize;
         if (sizeMismatch) {
             console.warn(`Embedded metadata size (${reportedSize}) did not match decrypted content size (${actualSize}). Using actual size.`);
         }
         const normalizedMetadata = {
-            name: metadata?.name || "image.bin",
+            name: safeName,
             type: metadata?.type || "application/octet-stream",
             size: sizeMismatch ? actualSize : (reportedSize ?? actualSize)
         };
