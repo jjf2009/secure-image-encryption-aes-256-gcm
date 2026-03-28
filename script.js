@@ -59,6 +59,18 @@ const btnEncrypt = document.getElementById('btn-encrypt');
 const btnDecrypt = document.getElementById('btn-decrypt');
 const btnDownloadTxt = document.getElementById('btn-download-txt');
 const btnDownloadImg = document.getElementById('btn-download-img');
+const encryptPasswordInput = document.getElementById('encrypt-password');
+const strengthBar = document.getElementById('password-strength-bar');
+const strengthLabel = document.getElementById('password-strength-label');
+const strengthWarning = document.getElementById('password-strength-warning');
+const criteriaCheckboxes = {
+    minLength: document.getElementById('criteria-length'),
+    longLength: document.getElementById('criteria-long'),
+    upperLower: document.getElementById('criteria-case'),
+    number: document.getElementById('criteria-number'),
+    special: document.getElementById('criteria-special'),
+    notCommon: document.getElementById('criteria-common')
+};
 const ciphertextOutput = document.getElementById('ciphertext-output');
 const btnSimulateAttack = document.getElementById('btn-simulate-attack');
 const attackStatus = document.getElementById('attack-status');
@@ -85,6 +97,7 @@ let encryptedBlobUrl = null;
 let decryptedBlobUrl = null;
 let lastEncryptedPayload = "";
 let lastEncryptionPassword = "";
+let encryptInProgress = false;
 
 const METADATA_DELIMITER = "::SECUREIMAGE_METADATA::";
 const DEFAULT_FILE_NAME = "file.bin";
@@ -102,6 +115,12 @@ let pbkdf2Chart = null;
 let primaryColorCache = null;
 // Benchmark range includes a low iteration count for comparative timing only (not a security recommendation).
 const BENCHMARK_ITERATIONS = [10000, 50000, 100000, 200000, 500000];
+const COMMON_PASSWORDS = [
+    "123456", "password", "123456789", "12345678", "12345",
+    "111111", "qwerty", "abc123", "password1", "123123",
+    "iloveyou", "1q2w3e4r", "000000", "letmein", "dragon",
+    "sunshine", "princess", "monkey", "login", "password123"
+];
 
 const getPrimaryColor = () => {
     if (primaryColorCache) return primaryColorCache;
@@ -131,6 +150,61 @@ const toggleSpinner = (spinnerEl, show) => {
     if (!spinnerEl) return;
     spinnerEl.style.display = show ? "inline-block" : "none";
 };
+
+const evaluatePasswordCriteria = (password) => {
+    const lower = password.toLowerCase();
+    return {
+        minLength: password.length >= 8,
+        longLength: password.length >= 12,
+        upperLower: /[a-z]/.test(password) && /[A-Z]/.test(password),
+        number: /\d/.test(password),
+        special: /[!@#$%^&*]/.test(password),
+        notCommon: password.length > 0 && !COMMON_PASSWORDS.includes(lower)
+    };
+};
+
+const determineStrength = (criteria) => {
+    const score = Object.values(criteria).filter(Boolean).length;
+    if (!criteria.minLength || score <= 2) return { label: "Weak", percentage: 25 };
+    if (score === 3) return { label: "Fair", percentage: 50 };
+    if (score === 4 || score === 5) return { label: "Strong", percentage: 75 };
+    return { label: "Very Strong", percentage: 100 };
+};
+
+const updatePasswordStrengthUI = () => {
+    if (!encryptPasswordInput || !strengthBar || !strengthLabel) return;
+    const password = encryptPasswordInput.value || "";
+    const criteria = evaluatePasswordCriteria(password);
+    const { label, percentage } = determineStrength(criteria);
+    const labelClass = `strength-${label.toLowerCase().replace(" ", "-")}`;
+
+    strengthLabel.textContent = label;
+    strengthLabel.className = `strength-text ${labelClass}`;
+
+    strengthBar.style.width = `${percentage}%`;
+    strengthBar.className = `strength-bar ${labelClass}`;
+
+    if (strengthWarning) {
+        strengthWarning.style.display = criteria.minLength ? "none" : "inline";
+        strengthWarning.textContent = criteria.minLength ? "" : "Minimum 8 characters required.";
+    }
+
+    Object.entries(criteriaCheckboxes).forEach(([key, checkbox]) => {
+        if (!checkbox) return;
+        const met = Boolean(criteria[key]);
+        checkbox.checked = met;
+        const item = checkbox.closest('.criteria-item');
+        if (item) {
+            item.classList.toggle('met', met);
+        }
+    });
+
+    if (btnEncrypt && !encryptInProgress) {
+        btnEncrypt.disabled = label === "Weak";
+    }
+};
+
+encryptPasswordInput?.addEventListener('input', updatePasswordStrengthUI);
 
 const formatBytes = (bytes) => {
     if (bytes === 0) return "0 B";
@@ -338,6 +412,8 @@ const renderComparisonPanel = async (file, ciphertextWithTagBytes) => {
     }
 };
 
+updatePasswordStrengthUI();
+
 // ENCRYPTION
 btnEncrypt.addEventListener('click', async () => {
     const fileInput = document.getElementById('image-upload');
@@ -352,6 +428,7 @@ btnEncrypt.addEventListener('click', async () => {
     }
 
     try {
+        encryptInProgress = true;
         btnEncrypt.disabled = true;
         spinner.style.display = "inline-block";
         status.style.display = "none";
@@ -440,8 +517,10 @@ btnEncrypt.addEventListener('click', async () => {
         }
         clearComparison();
     } finally {
+        encryptInProgress = false;
         btnEncrypt.disabled = false;
         spinner.style.display = "none";
+        updatePasswordStrengthUI();
     }
 });
 
