@@ -9,7 +9,8 @@
 SecureImage is a fully client-side AES-256-GCM encryption system for images that never transmits data or keys to a server. It derives strong keys from user passphrases using PBKDF2 (SHA-256, 100,000 iterations) and produces a portable Base64 payload that embeds both ciphertext and metadata. Beyond encryption, it provides attack simulation, diffusion/entropy visualizations, and performance analytics to demonstrate cryptographic principles with measurable evidence.
 
 ## Live Demo
-[Live Demo (placeholder)](https://example.com)
+[Live Demo (placeholder — replace with deployment URL)](https://example.com)  
+*Note: Update this link once the project is hosted.*
 
 ## Feature Matrix
 
@@ -57,7 +58,7 @@ Base64(SALT):Base64(IV):Base64(TAG):Base64(CIPHERTEXT)
 ## Visualization Features (What They Prove)
 
 - **Round-by-Round Diffusion Visualizer**  
-  Implements the real AES S-box, ShiftRows, MixColumns (GF(2^8)), and AddRoundKey to show how diffusion increases across all 14 rounds. The entropy score rises and histograms converge toward uniformity, evidencing the avalanche effect rather than mere visual obfuscation.
+  Implements the real AES S-box, ShiftRows, MixColumns (GF(2^8)), and AddRoundKey to show how diffusion increases across AES-256’s 14 rounds (captured as R0–R14 states). The entropy score rises and histograms converge toward uniformity, evidencing the avalanche effect rather than mere visual obfuscation.
 
 - **Entropy Visualization Panel**  
   Renders ciphertext bytes as pixel noise side-by-side with the original image and plots per-channel histograms. This visually demonstrates loss of structure and near-uniform distribution expected from secure ciphertext.
