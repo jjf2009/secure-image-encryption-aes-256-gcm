@@ -83,10 +83,10 @@ const FNV_PRIME = 0x01000193;
 
 let encryptedBlobUrl = null;
 let decryptedBlobUrl = null;
-let originalFileName = "image.png";
 let lastEncryptedPayload = "";
 let lastEncryptionPassword = "";
 
+const METADATA_DELIMITER = "::SECUREIMAGE_METADATA::";
 const FIXED_SALT = new TextEncoder().encode("SECUREIMAGE_SALT_PBKDF2");
 const BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
 let pbkdf2Chart = null;
@@ -326,8 +326,20 @@ btnEncrypt.addEventListener('click', async () => {
         clearComparison();
 
         const file = fileInput.files[0];
-        originalFileName = file.name;
         const arrayBuffer = await file.arrayBuffer();
+        const encoder = new TextEncoder();
+        const metadata = {
+            name: file.name || "image",
+            type: file.type || "application/octet-stream",
+            size: file.size
+        };
+        const metadataBytes = encoder.encode(JSON.stringify(metadata));
+        const delimiterBytes = encoder.encode(METADATA_DELIMITER);
+        const fileBytes = new Uint8Array(arrayBuffer);
+        const payload = new Uint8Array(metadataBytes.length + delimiterBytes.length + fileBytes.length);
+        payload.set(metadataBytes, 0);
+        payload.set(delimiterBytes, metadataBytes.length);
+        payload.set(fileBytes, metadataBytes.length + delimiterBytes.length);
 
         const iv = window.crypto.getRandomValues(new Uint8Array(12));
         const salt = window.crypto.getRandomValues(new Uint8Array(16));
@@ -336,7 +348,7 @@ btnEncrypt.addEventListener('click', async () => {
         const { data: encryptedData, duration: encryptionMs } = await encryptWithTiming(
             key,
             iv,
-            arrayBuffer
+            payload
         );
 
         const tagSize = 16;
@@ -365,7 +377,7 @@ btnEncrypt.addEventListener('click', async () => {
             mode: "Encryption",
             pbkdf2Ms,
             operationMs: encryptionMs,
-            fileSizeBytes: arrayBuffer.byteLength
+            fileSizeBytes: metadata.size
         });
 
         // Attack simulator priming
@@ -451,24 +463,70 @@ btnDecrypt.addEventListener('click', async () => {
             ciphertextWithTag
         );
 
-        const blob = new Blob([decryptedBuffer]);
+        const decryptedBytes = new Uint8Array(decryptedBuffer);
+        const delimiterBytes = new TextEncoder().encode(METADATA_DELIMITER);
+        const findDelimiterIndex = () => {
+            for (let i = 0; i <= decryptedBytes.length - delimiterBytes.length; i++) {
+                let match = true;
+                for (let j = 0; j < delimiterBytes.length; j++) {
+                    if (decryptedBytes[i + j] !== delimiterBytes[j]) {
+                        match = false;
+                        break;
+                    }
+                }
+                if (match) return i;
+            }
+            return -1;
+        };
+
+        const delimiterIndex = findDelimiterIndex();
+        if (delimiterIndex < 0) {
+            throw new Error("Metadata delimiter not found in decrypted payload.");
+        }
+
+        const metadataBytes = decryptedBytes.slice(0, delimiterIndex);
+        const fileBytes = decryptedBytes.slice(delimiterIndex + delimiterBytes.length);
+        const decoder = new TextDecoder();
+
+        let metadata;
+        try {
+            metadata = JSON.parse(decoder.decode(metadataBytes));
+        } catch (err) {
+            throw new Error("Failed to parse embedded metadata.");
+        }
+
+        if (!fileBytes.length) {
+            throw new Error("Decrypted file content missing.");
+        }
+
+        const actualSize = fileBytes.length;
+        const normalizedMetadata = {
+            name: metadata?.name || "image.bin",
+            type: metadata?.type || "application/octet-stream",
+            size: Number.isFinite(metadata?.size) && metadata.size === actualSize ? metadata.size : actualSize
+        };
+
+        const blob = new Blob([fileBytes], { type: normalizedMetadata.type });
         if (decryptedBlobUrl) URL.revokeObjectURL(decryptedBlobUrl);
         decryptedBlobUrl = URL.createObjectURL(blob);
 
         // Set attributes for native download link
-        const fileName = originalFileName.includes('.') ? originalFileName : "image.png";
         btnDownloadImg.href = decryptedBlobUrl;
-        btnDownloadImg.download = "restored_" + fileName;
+        btnDownloadImg.download = "restored_" + normalizedMetadata.name;
 
         previewImg.src = decryptedBlobUrl;
         previewArea.style.display = "block";
         btnDownloadImg.style.display = "inline-flex";
-        showStatus(status, "Decryption complete.", true);
+        showStatus(
+            status,
+            `Decryption complete. File: ${normalizedMetadata.name} (${normalizedMetadata.type}, ${formatBytes(normalizedMetadata.size)})`,
+            true
+        );
         updateStatsPanel({
             mode: "Decryption",
             pbkdf2Ms,
             operationMs: decryptionMs,
-            fileSizeBytes: decryptedBuffer.byteLength
+            fileSizeBytes: normalizedMetadata.size
         });
 
     } catch (e) {
