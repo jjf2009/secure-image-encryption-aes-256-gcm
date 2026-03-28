@@ -26,7 +26,7 @@ SecureImage is a fully client-side AES-256-GCM encryption system for images that
 | Embedded metadata | Original filename, MIME type, and size bundled inside ciphertext | ✅ |
 | Attack Simulation Panel | Bit-flip tampering demo with GCM integrity failure | ✅ |
 | Password strength validator | Real-time 4-level meter that blocks weak keys | ✅ |
-| Round-by-round diffusion visualizer | 14 AES rounds + R0 state, S-box/ShiftRows/MixColumns/AddRoundKey | ✅ |
+| Round-by-round diffusion visualizer | AES-256 rounds visualized as R0–R14 states with S-box/ShiftRows/MixColumns/AddRoundKey | ✅ |
 | Entropy visualization panel | Original vs ciphertext noise + pixel histograms | ✅ |
 | Performance benchmarking | PBKDF2 time, encryption time, throughput, iteration sweep | ✅ |
 
