@@ -136,8 +136,8 @@ const computeThroughputMBps = (bytes, timeMs) => {
 
 const updateStatsPanel = ({ mode, pbkdf2Ms, operationMs, fileSizeBytes }) => {
     if (!statMode || !statPbkdf2 || !statOperation || !statFileSize || !statThroughput) return;
-    const safeMode = mode || "Operation";
-    statMode.textContent = `Last ${safeMode}`;
+    const displayMode = mode || "Operation";
+    statMode.textContent = `Last ${displayMode}`;
     statPbkdf2.textContent = `${pbkdf2Ms.toFixed(1)} ms`;
     statOperation.textContent = `${operationMs.toFixed(1)} ms`;
     statFileSize.textContent = formatBytes(fileSizeBytes);
@@ -578,7 +578,7 @@ btnSimulateAttack.addEventListener('click', async () => {
 btnBenchmark?.addEventListener('click', async () => {
     if (!benchmarkChartCanvas) return;
     if (typeof Chart === "undefined") {
-        showStatus(benchmarkStatus, "Chart.js failed to load. Check your network or CDN availability.", false);
+        showStatus(benchmarkStatus, "Chart.js library not available. Please check your internet connection or verify the CDN URL in index.html.", false);
         btnBenchmark.disabled = true;
         return;
     }
