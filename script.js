@@ -466,15 +466,16 @@ btnDecrypt.addEventListener('click', async () => {
         const decryptedBytes = new Uint8Array(decryptedBuffer);
         const delimiterBytes = new TextEncoder().encode(METADATA_DELIMITER);
         const findDelimiterIndex = () => {
-            for (let i = 0; i <= decryptedBytes.length - delimiterBytes.length; i++) {
-                let match = true;
-                for (let j = 0; j < delimiterBytes.length; j++) {
-                    if (decryptedBytes[i + j] !== delimiterBytes[j]) {
-                        match = false;
-                        break;
+            let matchIndex = 0;
+            for (let i = 0; i < decryptedBytes.length; i++) {
+                if (decryptedBytes[i] === delimiterBytes[matchIndex]) {
+                    matchIndex++;
+                    if (matchIndex === delimiterBytes.length) {
+                        return i - delimiterBytes.length + 1;
                     }
+                } else {
+                    matchIndex = decryptedBytes[i] === delimiterBytes[0] ? 1 : 0;
                 }
-                if (match) return i;
             }
             return -1;
         };
@@ -500,10 +501,15 @@ btnDecrypt.addEventListener('click', async () => {
         }
 
         const actualSize = fileBytes.length;
+        const reportedSize = Number.isFinite(metadata?.size) ? metadata.size : null;
+        const sizeMismatch = reportedSize !== null && reportedSize !== actualSize;
+        if (sizeMismatch) {
+            console.warn(`Embedded metadata size (${reportedSize}) did not match decrypted content size (${actualSize}). Using actual size.`);
+        }
         const normalizedMetadata = {
             name: metadata?.name || "image.bin",
             type: metadata?.type || "application/octet-stream",
-            size: Number.isFinite(metadata?.size) && metadata.size === actualSize ? metadata.size : actualSize
+            size: sizeMismatch ? actualSize : (reportedSize ?? actualSize)
         };
 
         const blob = new Blob([fileBytes], { type: normalizedMetadata.type });
