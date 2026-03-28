@@ -82,7 +82,14 @@ let lastEncryptionPassword = "";
 const FIXED_SALT = new TextEncoder().encode("SECUREIMAGE_SALT_PBKDF2");
 const BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
 let pbkdf2Chart = null;
-const PRIMARY_COLOR = (getComputedStyle(document.documentElement).getPropertyValue('--primary') || '#4f46e5').trim();
+let primaryColorCache = null;
+const BENCHMARK_ITERATIONS = [10000, 50000, 100000, 200000, 500000];
+
+const getPrimaryColor = () => {
+    if (primaryColorCache) return primaryColorCache;
+    primaryColorCache = (getComputedStyle(document.documentElement).getPropertyValue('--primary') || '#4f46e5').trim() || '#4f46e5';
+    return primaryColorCache;
+};
 
 const showStatus = (el, msg, isSuccess) => {
     el.textContent = isSuccess ? "Success: " + msg : "Error: " + msg;
@@ -561,7 +568,7 @@ btnSimulateAttack.addEventListener('click', async () => {
 btnBenchmark?.addEventListener('click', async () => {
     if (!benchmarkChartCanvas) return;
     if (typeof Chart === "undefined") {
-        showStatus(benchmarkStatus, "Chart.js failed to load.", false);
+        showStatus(benchmarkStatus, "Chart.js failed to load. Check your network or CDN availability.", false);
         return;
     }
 
@@ -569,11 +576,10 @@ btnBenchmark?.addEventListener('click', async () => {
     toggleSpinner(benchmarkSpinner, true);
     if (benchmarkStatus) benchmarkStatus.style.display = "none";
 
-    const iterationSet = [10000, 50000, 100000, 200000, 500000];
     const durations = [];
 
     try {
-        for (const iterationCount of iterationSet) {
+        for (const iterationCount of BENCHMARK_ITERATIONS) {
             const salt = window.crypto.getRandomValues(new Uint8Array(16));
             const { duration } = await deriveKeyWithTiming("benchmark-password", salt, iterationCount);
             durations.push(duration);
@@ -586,12 +592,12 @@ btnBenchmark?.addEventListener('click', async () => {
         pbkdf2Chart = new Chart(context, {
             type: "line",
             data: {
-                labels: iterationSet.map((val) => val.toLocaleString()),
+                labels: BENCHMARK_ITERATIONS.map((val) => val.toLocaleString()),
                 datasets: [
                     {
                         label: "PBKDF2 derivation time (ms)",
                         data: durations.map((v) => Number(v.toFixed(1))),
-                        borderColor: PRIMARY_COLOR,
+                        borderColor: getPrimaryColor(),
                         backgroundColor: 'rgba(79, 70, 229, 0.1)',
                         tension: 0.25,
                         fill: true,
