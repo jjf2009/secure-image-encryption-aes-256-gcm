@@ -123,7 +123,7 @@ const COMMON_PASSWORDS = [
 ];
 const MIN_PASSWORD_LENGTH = 8;
 const STRONG_PASSWORD_LENGTH = 12;
-// Broad punctuation coverage for special-character detection.
+// Broad punctuation coverage for special-character detection (includes !@#$%^&*()_+-=[]{};:'",.<>/?\|~`).
 const SPECIAL_CHAR_PATTERN = /[!@#$%^&*()_\-+=\[\]{};:'",.<>/?\\|~`]/;
 const STRENGTH_SCORE_MAX = {
     weak: 2,
@@ -180,7 +180,8 @@ const evaluatePasswordCriteria = (password) => {
 
 const determineStrength = (criteria) => {
     const score = Object.values(criteria).filter(Boolean).length;
-    if (!criteria.minLength || score <= STRENGTH_SCORE_MAX.weak) return { label: "Weak", percentage: STRENGTH_PERCENTAGES.weak };
+    if (!criteria.minLength) return { label: "Weak", percentage: STRENGTH_PERCENTAGES.weak };
+    if (score <= STRENGTH_SCORE_MAX.weak) return { label: "Weak", percentage: STRENGTH_PERCENTAGES.weak };
     if (score <= STRENGTH_SCORE_MAX.fair) return { label: "Fair", percentage: STRENGTH_PERCENTAGES.fair };
     if (score <= STRENGTH_SCORE_MAX.strong) return { label: "Strong", percentage: STRENGTH_PERCENTAGES.strong };
     return { label: "Very Strong", percentage: STRENGTH_PERCENTAGES.veryStrong };
