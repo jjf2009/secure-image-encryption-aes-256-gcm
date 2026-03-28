@@ -55,6 +55,13 @@ const ciphertextOutput = document.getElementById('ciphertext-output');
 const btnSimulateAttack = document.getElementById('btn-simulate-attack');
 const attackStatus = document.getElementById('attack-status');
 const tamperDisplay = document.getElementById('tamper-display');
+const comparisonCard = document.getElementById('comparison-card');
+const originalCanvas = document.getElementById('original-canvas');
+const encryptedCanvas = document.getElementById('encrypted-canvas');
+const MAX_CANVAS_DIMENSION = 420;
+const NOISE_SEED_SAMPLE_SIZE = 1024;
+const FNV_OFFSET_BASIS = 0x811c9dc5;
+const FNV_PRIME = 0x01000193;
 
 let encryptedBlobUrl = null;
 let decryptedBlobUrl = null;
@@ -112,6 +119,104 @@ const renderTamperDisplay = (parts, tamperedSegment, tamperedIndex = parts.lengt
     tamperDisplay.innerHTML = segmentsHtml;
 };
 
+const clearComparison = () => {
+    if (comparisonCard) {
+        comparisonCard.style.display = "none";
+    }
+    [originalCanvas, encryptedCanvas].forEach((canvas) => {
+        if (canvas) {
+            const ctx = canvas.getContext('2d');
+            if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+    });
+};
+
+const computeCanvasSize = (bitmap) => {
+    if (!bitmap || bitmap.width <= 0 || bitmap.height <= 0) {
+        return null;
+    }
+    const scale = Math.min(1, MAX_CANVAS_DIMENSION / bitmap.width, MAX_CANVAS_DIMENSION / bitmap.height);
+    return {
+        width: Math.max(1, Math.round(bitmap.width * scale)),
+        height: Math.max(1, Math.round(bitmap.height * scale))
+    };
+};
+
+const drawOriginalImage = (bitmap, targetWidth, targetHeight) => {
+    if (!originalCanvas) return;
+    originalCanvas.width = targetWidth;
+    originalCanvas.height = targetHeight;
+    const ctx = originalCanvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, targetWidth, targetHeight);
+    ctx.drawImage(bitmap, 0, 0, targetWidth, targetHeight);
+};
+
+const drawEncryptedNoise = (bytes, targetWidth, targetHeight) => {
+    if (!encryptedCanvas || !bytes?.length) return;
+    encryptedCanvas.width = targetWidth;
+    encryptedCanvas.height = targetHeight;
+    const ctx = encryptedCanvas.getContext('2d');
+    if (!ctx) return;
+
+    const imageData = ctx.createImageData(targetWidth, targetHeight);
+    const data = imageData.data;
+    const len = bytes.length;
+    let state = FNV_OFFSET_BASIS;
+    const actualSampleSize = Math.min(len, NOISE_SEED_SAMPLE_SIZE);
+    const sampleStride = Math.max(1, Math.floor(len / actualSampleSize));
+    let sampleIndex = 0;
+    for (let sampled = 0; sampled < actualSampleSize; sampled++) {
+        state ^= bytes[sampleIndex];
+        state = Math.imul(state, FNV_PRIME);
+        sampleIndex = (sampleIndex + sampleStride) % len;
+    }
+    // Guard against a zero state after hashing the ciphertext sample (bytes is non-empty due to guard above).
+    if (state === 0) state = FNV_OFFSET_BASIS;
+
+    for (let i = 0; i < data.length; i += 4) {
+        // Xorshift32 PRNG step to spread ciphertext-derived entropy across pixels
+        state ^= state << 13;
+        state ^= state >>> 17;
+        state ^= state << 5;
+        state >>>= 0;
+        const startIndex = state % len;
+        data[i] = bytes[startIndex];
+        data[i + 1] = bytes[(startIndex + 1) % len];
+        data[i + 2] = bytes[(startIndex + 2) % len];
+        data[i + 3] = 255;
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+};
+
+const renderComparisonPanel = async (file, ciphertextWithTagBytes) => {
+    if (!comparisonCard || !file || !ciphertextWithTagBytes?.length) return;
+
+    let bitmap;
+    try {
+        bitmap = await createImageBitmap(file);
+    } catch (err) {
+        console.warn("Comparison panel unavailable: image decoding failed.", err);
+        clearComparison();
+        return;
+    }
+
+    try {
+        const size = computeCanvasSize(bitmap);
+        if (!size) {
+            throw new Error("Unable to determine image dimensions for comparison.");
+        }
+        const { width, height } = size;
+        drawOriginalImage(bitmap, width, height);
+        drawEncryptedNoise(ciphertextWithTagBytes, width, height);
+        comparisonCard.style.display = "block";
+    } catch (err) {
+        console.warn("Comparison panel unavailable during canvas rendering.", err);
+        clearComparison();
+    }
+};
+
 // ENCRYPTION
 btnEncrypt.addEventListener('click', async () => {
     const fileInput = document.getElementById('image-upload');
@@ -130,6 +235,7 @@ btnEncrypt.addEventListener('click', async () => {
         spinner.style.display = "inline-block";
         status.style.display = "none";
         downloadArea.style.display = "none";
+        clearComparison();
 
         const file = fileInput.files[0];
         originalFileName = file.name;
@@ -179,6 +285,8 @@ btnEncrypt.addEventListener('click', async () => {
             btnSimulateAttack.disabled = false;
         }
 
+        await renderComparisonPanel(file, ciphertextWithTag);
+
     } catch (e) {
         console.error(e);
         showStatus(status, e.message, false);
@@ -188,6 +296,7 @@ btnEncrypt.addEventListener('click', async () => {
         if (ciphertextOutput) {
             ciphertextOutput.value = "";
         }
+        clearComparison();
     } finally {
         btnEncrypt.disabled = false;
         spinner.style.display = "none";

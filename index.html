@@ -89,6 +89,26 @@
             </section>
         </main>
 
+        <section class="card" id="comparison-card" style="display: none;">
+            <div class="card-header">
+                <h2>Visual Comparison</h2>
+                <p>Original image pixels versus encrypted ciphertext rendered as noise.</p>
+            </div>
+
+            <div class="compare-grid">
+                <div class="compare-item">
+                    <p class="compare-label">Original</p>
+                    <canvas id="original-canvas" class="compare-canvas" aria-label="Original image preview"></canvas>
+                </div>
+                <div class="compare-item">
+                    <p class="compare-label">Encrypted Noise</p>
+                    <canvas id="encrypted-canvas" class="compare-canvas" aria-label="Encrypted noise preview"></canvas>
+                </div>
+            </div>
+
+            <p class="helper-text">The noise view uses ciphertext bytes mapped to pixel values to visualize randomness.</p>
+        </section>
+
         <section class="card">
             <div class="card-header">
                 <h2>Attack Simulator</h2>
