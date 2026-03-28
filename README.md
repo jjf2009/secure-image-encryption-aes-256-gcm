@@ -26,7 +26,7 @@ Live Demo (placeholder): `https://your-demo-url.example`
 | Embedded metadata | Original filename, MIME type, and size bundled inside ciphertext | ✅ |
 | Attack Simulation Panel | Bit-flip tampering demo with GCM integrity failure | ✅ |
 | Password strength validator | Real-time 4-level meter that blocks weak keys | ✅ |
-| Round-by-Round diffusion visualizer | Captures initial state (R0) plus rounds 1–14 with S-box/ShiftRows/MixColumns/AddRoundKey | ✅ |
+| Round-by-round diffusion visualizer | Captures initial state (R0) plus rounds 1–14 with S-box/ShiftRows/MixColumns/AddRoundKey | ✅ |
 | Entropy visualization panel | Original vs ciphertext noise + pixel histograms | ✅ |
 | Performance benchmarking | PBKDF2 time, encryption time, throughput, iteration sweep | ✅ |
 
