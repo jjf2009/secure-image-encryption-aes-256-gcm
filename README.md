@@ -17,7 +17,7 @@ Live Demo (placeholder): `https://your-demo-url.example`
 | Feature | Description | Status ✅ |
 | --- | --- | --- |
 | AES-256-GCM encryption/decryption | Authenticated encryption providing confidentiality and integrity | ✅ |
-| PBKDF2 key derivation (SHA-256, 100k) | Stretches passphrases into 256-bit keys with brute-force resistance | ✅ |
+| PBKDF2 key derivation (SHA-256, 100,000) | Stretches passphrases into 256-bit keys with brute-force resistance | ✅ |
 | Random 16-byte salt | Unique salt per encryption, embedded in payload | ✅ |
 | Random 12-byte IV | Ensures semantic security (same input ≠ same output) | ✅ |
 | Authentication tag validation | Detects tampering during decryption | ✅ |
