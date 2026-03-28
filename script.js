@@ -124,7 +124,11 @@ const COMMON_PASSWORDS = [
 ];
 const MIN_PASSWORD_LENGTH = 8;
 const STRONG_PASSWORD_LENGTH = 12;
-const SPECIAL_CHARACTERS = '!@#$%^&*()_+-=[]{};:\'",.<>/?\\|~`';
+const SPECIAL_CHARACTERS = `!@#$%^&*()_+-=[]{};:'",.<>/?\\|~\``;
+/**
+ * Escapes characters with special meaning inside regex character classes.
+ * Ensures the provided string can be embedded safely in a RegExp like /[...]/.
+ */
 const escapeForCharClass = (chars) => chars.replace(/[\\\]\[\^-]/g, '\\$&');
 const SPECIAL_CHAR_PATTERN = new RegExp(`[${escapeForCharClass(SPECIAL_CHARACTERS)}]`);
 const STRENGTH_SCORE_MAX = {
@@ -205,7 +209,7 @@ const updatePasswordStrengthUI = () => {
     const password = encryptPasswordInput.value || "";
     const criteria = evaluatePasswordCriteria(password);
     const { level, label, percentage } = determineStrength(criteria);
-    const labelClass = STRENGTH_CLASSES[level] || STRENGTH_CLASSES.weak;
+    const labelClass = STRENGTH_CLASSES[level];
 
     strengthLabel.textContent = label;
     strengthLabel.className = `strength-text ${labelClass}`;
@@ -228,8 +232,8 @@ const updatePasswordStrengthUI = () => {
         }
     });
 
-    if (btnEncrypt && !encryptInProgress) {
-        btnEncrypt.disabled = level === "weak";
+    if (btnEncrypt) {
+        btnEncrypt.disabled = encryptInProgress || level === "weak";
     }
 };
 
