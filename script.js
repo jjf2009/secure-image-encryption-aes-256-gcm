@@ -91,6 +91,18 @@ const getPrimaryColor = () => {
     return primaryColorCache;
 };
 
+const colorWithAlpha = (color, alpha) => {
+    const hexMatch = color.match(/^#?([a-fA-F0-9]{6})$/);
+    if (hexMatch) {
+        const hex = hexMatch[1];
+        const r = parseInt(hex.slice(0, 2), 16);
+        const g = parseInt(hex.slice(2, 4), 16);
+        const b = parseInt(hex.slice(4, 6), 16);
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+    return `rgba(79, 70, 229, ${alpha})`;
+};
+
 const showStatus = (el, msg, isSuccess) => {
     el.textContent = isSuccess ? "Success: " + msg : "Error: " + msg;
     el.className = `status-box ${isSuccess ? 'status-success' : 'status-error'}`;
@@ -103,7 +115,6 @@ const toggleSpinner = (spinnerEl, show) => {
 };
 
 const formatBytes = (bytes) => {
-    if (bytes < 0) return "0 KB";
     if (bytes === 0) return "0 KB";
     const kb = bytes / 1024;
     if (kb < 1024) return `${kb.toFixed(1)} KB`;
@@ -123,38 +134,26 @@ const updateStatsPanel = ({ mode, pbkdf2Ms, operationMs, fileSizeBytes }) => {
     statOperation.textContent = `${operationMs.toFixed(1)} ms`;
     statFileSize.textContent = formatBytes(fileSizeBytes);
     const throughput = computeThroughputMBps(fileSizeBytes, operationMs);
-    statThroughput.textContent = typeof throughput === "number" ? `${throughput.toFixed(2)} MB/s` : "—";
+    statThroughput.textContent = throughput > 0 ? `${throughput.toFixed(2)} MB/s` : "—";
     if (pbkdf2Warning) {
         pbkdf2Warning.style.display = pbkdf2Ms < 200 ? "block" : "none";
     }
 };
 
-const deriveKeyWithTiming = async (password, salt, iterations = 100000) => {
+const withTiming = async (operation) => {
     const start = performance.now();
-    const key = await deriveKey(password, salt, iterations);
-    const duration = performance.now() - start;
-    return { key, duration };
+    const data = await operation();
+    return { data, duration: performance.now() - start };
 };
 
-const encryptWithTiming = async (key, iv, dataBuffer) => {
-    const start = performance.now();
-    const encryptedData = await window.crypto.subtle.encrypt(
-        { name: "AES-GCM", iv: iv },
-        key,
-        dataBuffer
-    );
-    return { data: encryptedData, duration: performance.now() - start };
-};
+const deriveKeyWithTiming = async (password, salt, iterations = 100000) =>
+    withTiming(() => deriveKey(password, salt, iterations));
 
-const decryptWithTiming = async (key, iv, ciphertextWithTag) => {
-    const start = performance.now();
-    const decryptedBuffer = await window.crypto.subtle.decrypt(
-        { name: "AES-GCM", iv: iv },
-        key,
-        ciphertextWithTag
-    );
-    return { data: decryptedBuffer, duration: performance.now() - start };
-};
+const encryptWithTiming = async (key, iv, dataBuffer) =>
+    withTiming(() => window.crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, key, dataBuffer));
+
+const decryptWithTiming = async (key, iv, ciphertextWithTag) =>
+    withTiming(() => window.crypto.subtle.decrypt({ name: "AES-GCM", iv: iv }, key, ciphertextWithTag));
 
 const resetAttackPanel = () => {
     if (attackStatus) {
@@ -570,6 +569,7 @@ btnBenchmark?.addEventListener('click', async () => {
     if (!benchmarkChartCanvas) return;
     if (typeof Chart === "undefined") {
         showStatus(benchmarkStatus, "Chart.js failed to load. Check your network or CDN availability.", false);
+        btnBenchmark.disabled = true;
         return;
     }
 
@@ -599,7 +599,7 @@ btnBenchmark?.addEventListener('click', async () => {
                         label: "PBKDF2 derivation time (ms)",
                         data: durations.map((v) => Number(v.toFixed(1))),
                         borderColor: getPrimaryColor(),
-                        backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                        backgroundColor: colorWithAlpha(getPrimaryColor(), 0.1),
                         tension: 0.25,
                         fill: true,
                         pointRadius: 4,
