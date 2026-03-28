@@ -87,7 +87,7 @@ const BENCHMARK_ITERATIONS = [10000, 50000, 100000, 200000, 500000];
 
 const getPrimaryColor = () => {
     if (primaryColorCache) return primaryColorCache;
-    primaryColorCache = (getComputedStyle(document.documentElement).getPropertyValue('--primary') || '#4f46e5').trim() || '#4f46e5';
+    primaryColorCache = (getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#4f46e5');
     return primaryColorCache;
 };
 
@@ -103,7 +103,8 @@ const toggleSpinner = (spinnerEl, show) => {
 };
 
 const formatBytes = (bytes) => {
-    if (bytes <= 0) return "0 KB";
+    if (bytes < 0) return "0 KB";
+    if (bytes === 0) return "0 KB";
     const kb = bytes / 1024;
     if (kb < 1024) return `${kb.toFixed(1)} KB`;
     return `${(kb / 1024).toFixed(2)} MB`;
