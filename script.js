@@ -3,7 +3,10 @@
  */
 
 // Key Derivation logic
-const deriveKey = async (password, salt) => {
+const PBKDF2_ITERATIONS = 100000;
+const PBKDF2_WARNING_THRESHOLD_MS = 200;
+
+const deriveKeyInternal = async (password, salt, iterations) => {
     const encoder = new TextEncoder();
     const passwordKey = await window.crypto.subtle.importKey(
         "raw",
@@ -17,7 +20,7 @@ const deriveKey = async (password, salt) => {
         {
             name: "PBKDF2",
             salt: salt,
-            iterations: 100000,
+            iterations: iterations,
             hash: "SHA-256"
         },
         passwordKey,
@@ -26,6 +29,11 @@ const deriveKey = async (password, salt) => {
         ["encrypt", "decrypt"]
     );
 };
+
+const deriveKey = (password, salt) => deriveKeyInternal(password, salt, PBKDF2_ITERATIONS);
+
+const deriveKeyWithIterations = (password, salt, iterations = PBKDF2_ITERATIONS) =>
+    deriveKeyInternal(password, salt, iterations);
 
 // Base64 helpers
 const arrayBufferToBase64 = (buffer) => {
@@ -58,6 +66,16 @@ const tamperDisplay = document.getElementById('tamper-display');
 const comparisonCard = document.getElementById('comparison-card');
 const originalCanvas = document.getElementById('original-canvas');
 const encryptedCanvas = document.getElementById('encrypted-canvas');
+const statMode = document.getElementById('stat-mode');
+const statPbkdf2 = document.getElementById('stat-pbkdf2');
+const statOperation = document.getElementById('stat-operation');
+const statFileSize = document.getElementById('stat-filesize');
+const statThroughput = document.getElementById('stat-throughput');
+const pbkdf2Warning = document.getElementById('pbkdf2-warning');
+const btnBenchmark = document.getElementById('btn-benchmark');
+const benchmarkStatus = document.getElementById('benchmark-status');
+const benchmarkSpinner = document.getElementById('benchmark-spinner');
+const benchmarkChartCanvas = document.getElementById('pbkdf2-chart');
 const MAX_CANVAS_DIMENSION = 420;
 const NOISE_SEED_SAMPLE_SIZE = 1024;
 const FNV_OFFSET_BASIS = 0x811c9dc5;
@@ -71,12 +89,82 @@ let lastEncryptionPassword = "";
 
 const FIXED_SALT = new TextEncoder().encode("SECUREIMAGE_SALT_PBKDF2");
 const BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
+let pbkdf2Chart = null;
+let primaryColorCache = null;
+// Benchmark range includes a low iteration count for comparative timing only (not a security recommendation).
+const BENCHMARK_ITERATIONS = [10000, 50000, 100000, 200000, 500000];
+
+const getPrimaryColor = () => {
+    if (primaryColorCache) return primaryColorCache;
+    primaryColorCache = (getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#4f46e5');
+    return primaryColorCache;
+};
+
+const colorWithAlpha = (color, alpha) => {
+    const hexMatch = color.match(/^#?([a-fA-F0-9]{6})$/);
+    if (hexMatch) {
+        const hex = hexMatch[1];
+        const r = parseInt(hex.slice(0, 2), 16);
+        const g = parseInt(hex.slice(2, 4), 16);
+        const b = parseInt(hex.slice(4, 6), 16);
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+    return `rgba(79, 70, 229, ${alpha})`;
+};
 
 const showStatus = (el, msg, isSuccess) => {
     el.textContent = isSuccess ? "Success: " + msg : "Error: " + msg;
     el.className = `status-box ${isSuccess ? 'status-success' : 'status-error'}`;
     el.style.display = "block";
 };
+
+const toggleSpinner = (spinnerEl, show) => {
+    if (!spinnerEl) return;
+    spinnerEl.style.display = show ? "inline-block" : "none";
+};
+
+const formatBytes = (bytes) => {
+    if (bytes === 0) return "0 B";
+    const kb = bytes / 1024;
+    if (kb < 1024) return `${kb.toFixed(1)} KB`;
+    return `${(kb / 1024).toFixed(2)} MB`;
+};
+
+const computeThroughputMBps = (bytes, timeMs) => {
+    if (bytes <= 0 || timeMs <= 0) return 0;
+    return (bytes / 1048576) / (timeMs / 1000);
+};
+
+const updateStatsPanel = ({ mode, pbkdf2Ms, operationMs, fileSizeBytes }) => {
+    if (!statMode || !statPbkdf2 || !statOperation || !statFileSize || !statThroughput) return;
+    const displayMode = mode || "Operation";
+    statMode.textContent = `Last ${displayMode}`;
+    statPbkdf2.textContent = `${pbkdf2Ms.toFixed(1)} ms`;
+    statOperation.textContent = `${operationMs.toFixed(1)} ms`;
+    statFileSize.textContent = formatBytes(fileSizeBytes);
+    const throughput = computeThroughputMBps(fileSizeBytes, operationMs);
+    statThroughput.textContent = throughput > 0 ? `${throughput.toFixed(2)} MB/s` : "—";
+    if (pbkdf2Warning) {
+        pbkdf2Warning.style.display = pbkdf2Ms < PBKDF2_WARNING_THRESHOLD_MS ? "block" : "none";
+    }
+};
+
+const withTiming = async (operation) => {
+    const start = performance.now();
+    const data = await operation();
+    return { data, duration: performance.now() - start };
+};
+
+const deriveKeyWithTiming = async (password, salt, iterations = PBKDF2_ITERATIONS) => {
+    const { data, duration } = await withTiming(() => deriveKeyWithIterations(password, salt, iterations));
+    return { key: data, duration };
+};
+
+const encryptWithTiming = async (key, iv, dataBuffer) =>
+    withTiming(() => window.crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, key, dataBuffer));
+
+const decryptWithTiming = async (key, iv, ciphertextWithTag) =>
+    withTiming(() => window.crypto.subtle.decrypt({ name: "AES-GCM", iv: iv }, key, ciphertextWithTag));
 
 const resetAttackPanel = () => {
     if (attackStatus) {
@@ -243,11 +331,11 @@ btnEncrypt.addEventListener('click', async () => {
 
         const iv = window.crypto.getRandomValues(new Uint8Array(12));
         const salt = window.crypto.getRandomValues(new Uint8Array(16));
-        const key = await deriveKey(password, salt);
+        const { key, duration: pbkdf2Ms } = await deriveKeyWithTiming(password, salt);
 
-        const encryptedData = await window.crypto.subtle.encrypt(
-            { name: "AES-GCM", iv: iv },
+        const { data: encryptedData, duration: encryptionMs } = await encryptWithTiming(
             key,
+            iv,
             arrayBuffer
         );
 
@@ -273,6 +361,12 @@ btnEncrypt.addEventListener('click', async () => {
         
         downloadArea.style.display = "block";
         showStatus(status, "Encryption complete.", true);
+        updateStatsPanel({
+            mode: "Encryption",
+            pbkdf2Ms,
+            operationMs: encryptionMs,
+            fileSizeBytes: arrayBuffer.byteLength
+        });
 
         // Attack simulator priming
         lastEncryptedPayload = outputText;
@@ -349,11 +443,11 @@ btnDecrypt.addEventListener('click', async () => {
         ciphertextWithTag.set(ciphertext);
         ciphertextWithTag.set(tag, ciphertext.length);
 
-        const key = await deriveKey(password, salt);
+        const { key, duration: pbkdf2Ms } = await deriveKeyWithTiming(password, salt);
 
-        const decryptedBuffer = await window.crypto.subtle.decrypt(
-            { name: "AES-GCM", iv: iv },
+        const { data: decryptedBuffer, duration: decryptionMs } = await decryptWithTiming(
             key,
+            iv,
             ciphertextWithTag
         );
 
@@ -370,6 +464,12 @@ btnDecrypt.addEventListener('click', async () => {
         previewArea.style.display = "block";
         btnDownloadImg.style.display = "inline-flex";
         showStatus(status, "Decryption complete.", true);
+        updateStatsPanel({
+            mode: "Decryption",
+            pbkdf2Ms,
+            operationMs: decryptionMs,
+            fileSizeBytes: decryptedBuffer.byteLength
+        });
 
     } catch (e) {
         console.error(e);
@@ -473,5 +573,91 @@ btnSimulateAttack.addEventListener('click', async () => {
         attackStatus.textContent = "⚠️ Tampering Detected — Authentication tag mismatch. GCM integrity check failed.";
         attackStatus.className = "status-box status-error";
         attackStatus.style.display = "block";
+    }
+});
+
+btnBenchmark?.addEventListener('click', async () => {
+    if (!benchmarkChartCanvas) return;
+    if (typeof Chart === "undefined") {
+        showStatus(benchmarkStatus, "Chart.js library not available. Please check your internet connection or verify the CDN URL in index.html.", false);
+        return;
+    }
+
+    btnBenchmark.disabled = true;
+    toggleSpinner(benchmarkSpinner, true);
+    if (benchmarkStatus) benchmarkStatus.style.display = "none";
+
+    const durations = [];
+
+    try {
+        for (const iterationCount of BENCHMARK_ITERATIONS) {
+            const salt = window.crypto.getRandomValues(new Uint8Array(16));
+            const { duration } = await deriveKeyWithTiming("benchmark-password", salt, iterationCount);
+            durations.push(duration);
+        }
+
+        const context = benchmarkChartCanvas.getContext('2d');
+        if (pbkdf2Chart) {
+            pbkdf2Chart.destroy();
+        }
+        pbkdf2Chart = new Chart(context, {
+            type: "line",
+            data: {
+                labels: BENCHMARK_ITERATIONS.map((val) => val.toLocaleString()),
+                datasets: [
+                    {
+                        label: "PBKDF2 derivation time (ms)",
+                        data: durations.map((v) => Number(v.toFixed(1))),
+                        borderColor: getPrimaryColor(),
+                        backgroundColor: colorWithAlpha(getPrimaryColor(), 0.1),
+                        tension: 0.25,
+                        fill: true,
+                        pointRadius: 4,
+                        pointHoverRadius: 5
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: "PBKDF2 iteration benchmark (ms)"
+                    },
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => `${ctx.parsed.y.toFixed(1)} ms`
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: "Iterations"
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: "Milliseconds"
+                        }
+                    }
+                }
+            }
+        });
+
+        showStatus(benchmarkStatus, "Benchmark complete.", true);
+    } catch (err) {
+        console.error(err);
+        showStatus(benchmarkStatus, "Benchmark failed. Try again.", false);
+    } finally {
+        btnBenchmark.disabled = false;
+        toggleSpinner(benchmarkSpinner, false);
     }
 });
