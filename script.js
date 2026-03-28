@@ -135,7 +135,7 @@ const encryptWithTiming = async (key, iv, dataBuffer) => {
         key,
         dataBuffer
     );
-    return { encryptedData, duration: performance.now() - start };
+    return { data: encryptedData, duration: performance.now() - start };
 };
 
 const decryptWithTiming = async (key, iv, ciphertextWithTag) => {
@@ -145,7 +145,7 @@ const decryptWithTiming = async (key, iv, ciphertextWithTag) => {
         key,
         ciphertextWithTag
     );
-    return { decryptedBuffer, duration: performance.now() - start };
+    return { data: decryptedBuffer, duration: performance.now() - start };
 };
 
 const resetAttackPanel = () => {
@@ -315,7 +315,7 @@ btnEncrypt.addEventListener('click', async () => {
         const salt = window.crypto.getRandomValues(new Uint8Array(16));
         const { key, duration: pbkdf2Ms } = await deriveKeyWithTiming(password, salt);
 
-        const { encryptedData, duration: encryptionMs } = await encryptWithTiming(
+        const { data: encryptedData, duration: encryptionMs } = await encryptWithTiming(
             key,
             iv,
             arrayBuffer
@@ -427,7 +427,7 @@ btnDecrypt.addEventListener('click', async () => {
 
         const { key, duration: pbkdf2Ms } = await deriveKeyWithTiming(password, salt);
 
-        const { decryptedBuffer, duration: decryptionMs } = await decryptWithTiming(
+        const { data: decryptedBuffer, duration: decryptionMs } = await decryptWithTiming(
             key,
             iv,
             ciphertextWithTag
