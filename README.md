@@ -9,8 +9,8 @@
 SecureImage is a fully client-side AES-256-GCM encryption system for images that never transmits data or keys to a server. It derives strong keys from user passphrases using PBKDF2 (SHA-256, 100,000 iterations) and produces a portable Base64 payload that embeds both ciphertext and metadata. Beyond encryption, it provides attack simulation, diffusion/entropy visualizations, and performance analytics to demonstrate cryptographic principles with measurable evidence.
 
 ## Live Demo
-[Live Demo (TODO: replace with deployment URL)](#)  
-*Note: This placeholder link should be updated once the project is hosted.*
+Live Demo (placeholder): `https://your-demo-url.example`  
+*Note: Replace this placeholder with the actual hosted URL.*
 
 ## Feature Matrix
 
