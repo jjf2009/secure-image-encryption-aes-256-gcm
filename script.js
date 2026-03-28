@@ -87,6 +87,10 @@ let lastEncryptedPayload = "";
 let lastEncryptionPassword = "";
 
 const METADATA_DELIMITER = "::SECUREIMAGE_METADATA::";
+const DEFAULT_FILE_NAME = "file.bin";
+const MAX_FILENAME_LENGTH = 200;
+const MAX_METADATA_SIZE = 10 * 1024; // 10 KB
+const MAX_FILESIZE_BYTES = 200 * 1024 * 1024; // 200 MB ceiling
 const RESERVED_FILENAMES = new Set([
     "CON", "PRN", "AUX", "NUL",
     "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
@@ -138,6 +142,30 @@ const formatBytes = (bytes) => {
 const computeThroughputMBps = (bytes, timeMs) => {
     if (bytes <= 0 || timeMs <= 0) return 0;
     return (bytes / 1048576) / (timeMs / 1000);
+};
+
+const sanitizeFileName = (name) => {
+    const originalName = name || DEFAULT_FILE_NAME;
+    if (/[\\/]/.test(originalName)) {
+        console.warn("Embedded filename contained path separators; using last segment.");
+    }
+    const base = originalName.split(/[\\/]/).pop();
+    const withoutControl = base.replace(/[\x00-\x1F\x80-\x9F]/g, "");
+    const cleaned = withoutControl.replace(/[<>:"/\\|?*]/g, "_").trim();
+    const stripped = cleaned.replace(/^\.+/, "").replace(/\.+$/, "");
+    const dotIndex = stripped.lastIndexOf(".");
+    const nameRoot = dotIndex === -1 ? (stripped || "file") : stripped.slice(0, dotIndex);
+    const extension = dotIndex === -1 ? "" : stripped.slice(dotIndex);
+    const baseRoot = (nameRoot.split(".")[0] || nameRoot || "file").toUpperCase();
+    const needsAdjust = RESERVED_FILENAMES.has(baseRoot);
+    const adjustedRoot = needsAdjust ? `${nameRoot}_file` : nameRoot;
+    const candidate = `${adjustedRoot}${extension}`.replace(/^\.+/, "") || DEFAULT_FILE_NAME;
+    if (candidate.length <= MAX_FILENAME_LENGTH) return candidate;
+    const lastDot = candidate.lastIndexOf(".");
+    const ext = lastDot >= 0 ? candidate.slice(lastDot) : "";
+    const baseTruncated = lastDot >= 0 ? candidate.slice(0, lastDot) : candidate;
+    const trimmedBase = baseTruncated.slice(0, Math.max(1, MAX_FILENAME_LENGTH - ext.length));
+    return `${trimmedBase}${ext}`;
 };
 
 const updateStatsPanel = ({ mode, pbkdf2Ms, operationMs, fileSizeBytes }) => {
@@ -484,18 +512,13 @@ btnDecrypt.addEventListener('click', async () => {
         const delimiterStart = metadataEnd;
         const delimiterEnd = delimiterStart + delimiterBytes.length;
 
-        if (metadataLength <= 0 || delimiterEnd > decryptedBytes.length) {
+        if (metadataLength <= 0 || metadataLength > MAX_METADATA_SIZE || delimiterEnd > decryptedBytes.length) {
             throw new Error("Invalid metadata length.");
         }
 
-        let delimiterValid = true;
-        for (let i = 0; i < delimiterBytes.length; i++) {
-            if (decryptedBytes[delimiterStart + i] !== delimiterBytes[i]) {
-                delimiterValid = false;
-                break;
-            }
-        }
-
+        const delimiterSegment = decryptedBytes.subarray(delimiterStart, delimiterEnd);
+        const delimiterValid = delimiterSegment.length === delimiterBytes.length &&
+            delimiterBytes.every((byte, idx) => delimiterSegment[idx] === byte);
         if (!delimiterValid) {
             throw new Error("Metadata delimiter not found in decrypted payload.");
         }
@@ -511,48 +534,10 @@ btnDecrypt.addEventListener('click', async () => {
             throw new Error("Failed to parse embedded metadata.");
         }
 
-        const sanitizeFileName = (name) => {
-            const DEFAULT_NAME = "file.bin";
-            const MAX_LENGTH = 200;
-            const warnAndStripPath = (value) => {
-                if (/[\\/]/.test(value)) {
-                    console.warn("Embedded filename contained path separators; using last segment.");
-                }
-                return value.split(/[\\/]/).pop();
-            };
-            const removeControlChars = (value) => value.replace(/[\x00-\x1F\x80-\x9F]/g, "");
-            const replaceIllegalChars = (value) => value.replace(/[<>:"/\\|?*]/g, "_").trim();
-            const ensureNonReservedName = (root, extension) => {
-                const baseRoot = (root.split(".")[0] || root || "file").toUpperCase();
-                const needsAdjust = RESERVED_FILENAMES.has(baseRoot);
-                const adjustedRoot = needsAdjust ? `${root}_file` : root;
-                return `${adjustedRoot}${extension}`.replace(/^\.+/, "") || DEFAULT_NAME;
-            };
-            const enforceMaxLength = (value) => {
-                if (value.length <= MAX_LENGTH) return value;
-                const lastDot = value.lastIndexOf(".");
-                const ext = lastDot >= 0 ? value.slice(lastDot) : "";
-                const base = lastDot >= 0 ? value.slice(0, lastDot) : value;
-                const trimmedBase = base.slice(0, Math.max(1, MAX_LENGTH - ext.length));
-                return `${trimmedBase}${ext}`;
-            };
-
-            const originalName = name || DEFAULT_NAME;
-            const base = warnAndStripPath(originalName);
-            const withoutControl = removeControlChars(base);
-            const cleaned = replaceIllegalChars(withoutControl);
-            const stripped = cleaned.replace(/^\.+/, "").replace(/\.+$/, "");
-            const dotIndex = stripped.lastIndexOf(".");
-            const nameRoot = dotIndex === -1 ? (stripped || "file") : stripped.slice(0, dotIndex);
-            const extension = dotIndex === -1 ? "" : stripped.slice(dotIndex);
-            const normalized = ensureNonReservedName(nameRoot, extension) || DEFAULT_NAME;
-            return enforceMaxLength(normalized) || DEFAULT_NAME;
-        };
-
         const safeName = sanitizeFileName(metadata?.name);
         const actualSize = fileBytes.length;
         const parsedSize = Number(metadata?.size);
-        const reportedSize = (Number.isFinite(parsedSize) && Number.isSafeInteger(parsedSize) && parsedSize >= 0)
+        const reportedSize = (Number.isFinite(parsedSize) && Number.isSafeInteger(parsedSize) && parsedSize >= 0 && parsedSize <= MAX_FILESIZE_BYTES)
             ? parsedSize
             : null;
         if (reportedSize !== null && reportedSize !== actualSize) {
