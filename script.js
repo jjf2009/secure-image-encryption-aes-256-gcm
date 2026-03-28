@@ -466,7 +466,7 @@ btnDecrypt.addEventListener('click', async () => {
         const decryptedBytes = new Uint8Array(decryptedBuffer);
         const delimiterBytes = new TextEncoder().encode(METADATA_DELIMITER);
         const findDelimiterIndex = () => {
-            const searchLength = Math.min(decryptedBytes.length, Math.max(4096, delimiterBytes.length));
+            const searchLength = decryptedBytes.length;
             let matchIndex = 0;
             for (let i = 0; i < searchLength; i++) {
                 if (decryptedBytes[i] === delimiterBytes[matchIndex]) {
@@ -503,14 +503,23 @@ btnDecrypt.addEventListener('click', async () => {
 
         const sanitizeFileName = (name) => {
             const base = (name || "image.bin").split(/[\\/]/).pop();
-            const cleaned = base.replace(/[<>:"/\\|?*\x00-\x1F]/g, "_").trim();
+            const withoutControl = base.replace(/[\x00-\x1F\x80-\x9F]/g, "");
+            const cleaned = withoutControl.replace(/[<>:"/\\|?*]/g, "_").trim();
             const stripped = cleaned.replace(/^\.+/, "").replace(/\.+$/, "");
-            return stripped || "image.bin";
+            const safeBase = stripped || "image";
+            const dotIndex = safeBase.lastIndexOf(".");
+            const nameRoot = dotIndex === -1 ? safeBase : safeBase.slice(0, dotIndex);
+            const extension = dotIndex === -1 ? "" : safeBase.slice(dotIndex);
+            const reservedNames = new Set(["CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"]);
+            const adjustedRoot = reservedNames.has(nameRoot.toUpperCase()) ? `${nameRoot}_file` : nameRoot;
+            const finalName = `${adjustedRoot}${extension}`.replace(/^\.+/, "");
+            return finalName || "image.bin";
         };
 
         const safeName = sanitizeFileName(metadata?.name);
         const actualSize = fileBytes.length;
-        const reportedSize = Number.isSafeInteger(metadata?.size) && metadata.size >= 0 ? metadata.size : null;
+        const parsedSize = Number(metadata?.size);
+        const reportedSize = Number.isSafeInteger(parsedSize) && parsedSize >= 0 ? parsedSize : null;
         const sizeMismatch = reportedSize !== null && reportedSize !== actualSize;
         if (sizeMismatch) {
             console.warn(`Embedded metadata size (${reportedSize}) did not match decrypted content size (${actualSize}). Using actual size.`);
