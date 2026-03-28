@@ -121,12 +121,20 @@ const COMMON_PASSWORDS = [
     "iloveyou", "1q2w3e4r", "000000", "letmein", "dragon",
     "sunshine", "princess", "monkey", "login", "password123"
 ];
+const MIN_PASSWORD_LENGTH = 8;
+const STRONG_PASSWORD_LENGTH = 12;
 // Broad punctuation coverage for special-character detection.
-const SPECIAL_CHAR_PATTERN = /[!@#$%^&*()_\-+=\[\]{};:'",.<>/?\\|~]/;
+const SPECIAL_CHAR_PATTERN = /[!@#$%^&*()_\-+=\[\]{};:'",.<>/?\\|~`]/;
 const STRENGTH_SCORE_MAX = {
     weak: 2,
     fair: 4,
     strong: 5
+};
+const STRENGTH_PERCENTAGES = {
+    weak: 25,
+    fair: 50,
+    strong: 75,
+    veryStrong: 100
 };
 
 const getPrimaryColor = () => {
@@ -161,8 +169,8 @@ const toggleSpinner = (spinnerEl, show) => {
 const evaluatePasswordCriteria = (password) => {
     const lower = password.toLowerCase();
     return {
-        minLength: password.length >= 8,
-        longLength: password.length >= 12,
+        minLength: password.length >= MIN_PASSWORD_LENGTH,
+        longLength: password.length >= STRONG_PASSWORD_LENGTH,
         upperLower: /[a-z]/.test(password) && /[A-Z]/.test(password),
         number: /\d/.test(password),
         special: SPECIAL_CHAR_PATTERN.test(password),
@@ -172,10 +180,10 @@ const evaluatePasswordCriteria = (password) => {
 
 const determineStrength = (criteria) => {
     const score = Object.values(criteria).filter(Boolean).length;
-    if (!criteria.minLength || score <= STRENGTH_SCORE_MAX.weak) return { label: "Weak", percentage: 25 };
-    if (score <= STRENGTH_SCORE_MAX.fair) return { label: "Fair", percentage: 50 };
-    if (score <= STRENGTH_SCORE_MAX.strong) return { label: "Strong", percentage: 75 };
-    return { label: "Very Strong", percentage: 100 };
+    if (!criteria.minLength || score <= STRENGTH_SCORE_MAX.weak) return { label: "Weak", percentage: STRENGTH_PERCENTAGES.weak };
+    if (score <= STRENGTH_SCORE_MAX.fair) return { label: "Fair", percentage: STRENGTH_PERCENTAGES.fair };
+    if (score <= STRENGTH_SCORE_MAX.strong) return { label: "Strong", percentage: STRENGTH_PERCENTAGES.strong };
+    return { label: "Very Strong", percentage: STRENGTH_PERCENTAGES.veryStrong };
 };
 
 const updatePasswordStrengthUI = () => {
@@ -193,7 +201,7 @@ const updatePasswordStrengthUI = () => {
 
     if (strengthWarning) {
         strengthWarning.style.display = criteria.minLength ? "none" : "inline";
-        strengthWarning.textContent = criteria.minLength ? "" : "Minimum 8 characters required.";
+        strengthWarning.textContent = criteria.minLength ? "" : `Minimum ${MIN_PASSWORD_LENGTH} characters required.`;
     }
 
     Object.entries(criteriaCheckboxes).forEach(([key, checkbox]) => {
