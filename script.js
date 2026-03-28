@@ -125,10 +125,16 @@ const COMMON_PASSWORDS = [
 ];
 const MIN_PASSWORD_LENGTH = 8;
 const STRONG_PASSWORD_LENGTH = 12;
-const SPECIAL_CHARACTERS = '!@#$%^&*()_+-=[]{};:\'",.<>/?\\|~\\`';
+// Set of allowed special characters kept as an explicit list to avoid escape ambiguity.
+const SPECIAL_CHARACTERS = [
+    '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', '-', '=', '[',
+    ']', '{', '}', ';', ':', "'", '"', ',', '.', '<', '>', '/', '?', '\\', '|', '~', '`'
+].join('');
 /**
  * Escapes characters with special meaning inside regex character classes.
  * Ensures the provided string can be embedded safely in a RegExp like /[...]/.
+ * Escapes backslash (escape), square brackets (class delimiters), caret (negation),
+ * and hyphen (range definition) which are the special tokens within [].
  */
 const escapeForCharClass = (chars) => chars.replace(/[\\\[\]\^-]/g, '\\$&');
 const SPECIAL_CHAR_PATTERN = new RegExp(`[${escapeForCharClass(SPECIAL_CHARACTERS)}]`);
