@@ -490,19 +490,19 @@ btnDecrypt.addEventListener('click', async () => {
             };
 
             const lps = buildLPSTable(delimiterBytes);
-            let i = 0;
-            let j = 0;
-            while (i < decryptedBytes.length) {
-                if (decryptedBytes[i] === delimiterBytes[j]) {
-                    i++;
-                    j++;
-                    if (j === delimiterBytes.length) {
-                        return i - j;
+            let textIndex = 0;
+            let patternIndex = 0;
+            while (textIndex < decryptedBytes.length) {
+                if (decryptedBytes[textIndex] === delimiterBytes[patternIndex]) {
+                    textIndex++;
+                    patternIndex++;
+                    if (patternIndex === delimiterBytes.length) {
+                        return textIndex - patternIndex;
                     }
-                } else if (j !== 0) {
-                    j = lps[j - 1];
+                } else if (patternIndex !== 0) {
+                    patternIndex = lps[patternIndex - 1];
                 } else {
-                    i++;
+                    textIndex++;
                 }
             }
             return -1;
@@ -522,10 +522,6 @@ btnDecrypt.addEventListener('click', async () => {
             metadata = JSON.parse(decoder.decode(metadataBytes));
         } catch (err) {
             throw new Error("Failed to parse embedded metadata.");
-        }
-
-        if (!fileBytes.length) {
-            throw new Error("Decrypted file content missing.");
         }
 
         const sanitizeFileName = (name) => {
@@ -556,11 +552,10 @@ btnDecrypt.addEventListener('click', async () => {
 
         const safeName = sanitizeFileName(metadata?.name);
         const actualSize = fileBytes.length;
-        const isValidFileSize = (size) =>
-            !Number.isNaN(size) && Number.isSafeInteger(size) && size >= 0;
-
         const parsedSize = Number(metadata?.size);
-        const reportedSize = isValidFileSize(parsedSize) ? parsedSize : null;
+        const reportedSize = (!Number.isNaN(parsedSize) && Number.isSafeInteger(parsedSize) && parsedSize >= 0)
+            ? parsedSize
+            : null;
         if (reportedSize !== null && reportedSize !== actualSize) {
             console.warn(`Embedded metadata size (${reportedSize}) did not match decrypted content size (${actualSize}). Using actual size.`);
         }
