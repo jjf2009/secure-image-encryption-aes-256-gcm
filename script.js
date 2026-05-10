@@ -1210,172 +1210,172 @@ document.getElementById('txt-upload').addEventListener('change', function(e) {
 });
 
 // Attack Simulator
-btnSimulateAttack.addEventListener('click', async () => {
-    if (!lastEncryptedPayload || !lastEncryptionPassword) {
-        attackStatus.textContent = "Encrypt an image first to generate ciphertext.";
-        attackStatus.className = "status-box status-error";
-        attackStatus.style.display = "block";
-        return;
-    }
+// btnSimulateAttack.addEventListener('click', async () => {
+//     if (!lastEncryptedPayload || !lastEncryptionPassword) {
+//         attackStatus.textContent = "Encrypt an image first to generate ciphertext.";
+//         attackStatus.className = "status-box status-error";
+//         attackStatus.style.display = "block";
+//         return;
+//     }
 
-    attackStatus.style.display = "none";
-    const parts = lastEncryptedPayload.split(':');
-    if (parts.length < 3) {
-        attackStatus.textContent = "Ciphertext format invalid for simulation.";
-        attackStatus.className = "status-box status-error";
-        attackStatus.style.display = "block";
-        return;
-    }
+//     attackStatus.style.display = "none";
+//     const parts = lastEncryptedPayload.split(':');
+//     if (parts.length < 3) {
+//         attackStatus.textContent = "Ciphertext format invalid for simulation.";
+//         attackStatus.className = "status-box status-error";
+//         attackStatus.style.display = "block";
+//         return;
+//     }
 
-    const cipherIndex = parts.length - 1;
-    const originalCipherSegment = parts[cipherIndex];
-    if (!originalCipherSegment) {
-        attackStatus.textContent = "Ciphertext segment missing; cannot simulate tampering.";
-        attackStatus.className = "status-box status-error";
-        attackStatus.style.display = "block";
-        return;
-    }
-    const flipIndex = Math.floor(Math.random() * Math.max(1, originalCipherSegment.length));
-    const currentChar = originalCipherSegment[flipIndex];
-    const currentIndex = BASE64_CHARS.indexOf(currentChar);
-    let replacementChar = "A";
-    if (currentIndex >= 0) {
-        replacementChar = BASE64_CHARS[(currentIndex + 1) % BASE64_CHARS.length];
-        if (replacementChar === currentChar) {
-            replacementChar = BASE64_CHARS[(currentIndex + 2) % BASE64_CHARS.length];
-        }
-    } else {
-        replacementChar = currentChar === "A" ? "B" : "A";
-    }
-    const tamperedSegment = `${originalCipherSegment.substring(0, flipIndex)}${replacementChar}${originalCipherSegment.substring(flipIndex + 1)}`;
+//     const cipherIndex = parts.length - 1;
+//     const originalCipherSegment = parts[cipherIndex];
+//     if (!originalCipherSegment) {
+//         attackStatus.textContent = "Ciphertext segment missing; cannot simulate tampering.";
+//         attackStatus.className = "status-box status-error";
+//         attackStatus.style.display = "block";
+//         return;
+//     }
+//     const flipIndex = Math.floor(Math.random() * Math.max(1, originalCipherSegment.length));
+//     const currentChar = originalCipherSegment[flipIndex];
+//     const currentIndex = BASE64_CHARS.indexOf(currentChar);
+//     let replacementChar = "A";
+//     if (currentIndex >= 0) {
+//         replacementChar = BASE64_CHARS[(currentIndex + 1) % BASE64_CHARS.length];
+//         if (replacementChar === currentChar) {
+//             replacementChar = BASE64_CHARS[(currentIndex + 2) % BASE64_CHARS.length];
+//         }
+//     } else {
+//         replacementChar = currentChar === "A" ? "B" : "A";
+//     }
+//     const tamperedSegment = `${originalCipherSegment.substring(0, flipIndex)}${replacementChar}${originalCipherSegment.substring(flipIndex + 1)}`;
 
-    const tamperedParts = [...parts];
-    tamperedParts[cipherIndex] = tamperedSegment;
-    const tamperedPayload = tamperedParts.join(':');
+//     const tamperedParts = [...parts];
+//     tamperedParts[cipherIndex] = tamperedSegment;
+//     const tamperedPayload = tamperedParts.join(':');
 
-    renderTamperDisplay(tamperedParts, tamperedSegment, cipherIndex);
-    if (ciphertextOutput) {
-        ciphertextOutput.value = tamperedPayload;
-    }
+//     renderTamperDisplay(tamperedParts, tamperedSegment, cipherIndex);
+//     if (ciphertextOutput) {
+//         ciphertextOutput.value = tamperedPayload;
+//     }
 
-    try {
-        let salt, iv, tag, ciphertext;
-        if (tamperedParts.length === 4) {
-            salt = new Uint8Array(base64ToArrayBuffer(tamperedParts[0]));
-            iv = new Uint8Array(base64ToArrayBuffer(tamperedParts[1]));
-            tag = new Uint8Array(base64ToArrayBuffer(tamperedParts[2]));
-            ciphertext = new Uint8Array(base64ToArrayBuffer(tamperedParts[3]));
-        } else {
-            salt = FIXED_SALT;
-            iv = new Uint8Array(base64ToArrayBuffer(tamperedParts[0]));
-            tag = new Uint8Array(base64ToArrayBuffer(tamperedParts[1]));
-            ciphertext = new Uint8Array(base64ToArrayBuffer(tamperedParts[2]));
-        }
+//     try {
+//         let salt, iv, tag, ciphertext;
+//         if (tamperedParts.length === 4) {
+//             salt = new Uint8Array(base64ToArrayBuffer(tamperedParts[0]));
+//             iv = new Uint8Array(base64ToArrayBuffer(tamperedParts[1]));
+//             tag = new Uint8Array(base64ToArrayBuffer(tamperedParts[2]));
+//             ciphertext = new Uint8Array(base64ToArrayBuffer(tamperedParts[3]));
+//         } else {
+//             salt = FIXED_SALT;
+//             iv = new Uint8Array(base64ToArrayBuffer(tamperedParts[0]));
+//             tag = new Uint8Array(base64ToArrayBuffer(tamperedParts[1]));
+//             ciphertext = new Uint8Array(base64ToArrayBuffer(tamperedParts[2]));
+//         }
 
-        const ciphertextWithTag = new Uint8Array(ciphertext.length + tag.length);
-        ciphertextWithTag.set(ciphertext);
-        ciphertextWithTag.set(tag, ciphertext.length);
+//         const ciphertextWithTag = new Uint8Array(ciphertext.length + tag.length);
+//         ciphertextWithTag.set(ciphertext);
+//         ciphertextWithTag.set(tag, ciphertext.length);
 
-        const key = await deriveKey(lastEncryptionPassword, salt);
-        await window.crypto.subtle.decrypt(
-            { name: "AES-GCM", iv: iv },
-            key,
-            ciphertextWithTag
-        );
+//         const key = await deriveKey(lastEncryptionPassword, salt);
+//         await window.crypto.subtle.decrypt(
+//             { name: "AES-GCM", iv: iv },
+//             key,
+//             ciphertextWithTag
+//         );
 
-        attackStatus.textContent = "Tampering went undetected (unexpected).";
-        attackStatus.className = "status-box status-error";
-        attackStatus.style.display = "block";
-    } catch (e) {
-        console.warn("Tampering detected during simulated decrypt.");
-        attackStatus.textContent = "⚠️ Tampering Detected — Authentication tag mismatch. GCM integrity check failed.";
-        attackStatus.className = "status-box status-error";
-        attackStatus.style.display = "block";
-    }
-});
+//         attackStatus.textContent = "Tampering went undetected (unexpected).";
+//         attackStatus.className = "status-box status-error";
+//         attackStatus.style.display = "block";
+//     } catch (e) {
+//         console.warn("Tampering detected during simulated decrypt.");
+//         attackStatus.textContent = "⚠️ Tampering Detected — Authentication tag mismatch. GCM integrity check failed.";
+//         attackStatus.className = "status-box status-error";
+//         attackStatus.style.display = "block";
+//     }
+// });
 
-btnBenchmark?.addEventListener('click', async () => {
-    if (!benchmarkChartCanvas) return;
-    if (typeof Chart === "undefined") {
-        showStatus(benchmarkStatus, "Chart.js library not available. Please check your internet connection or verify the CDN URL in index.html.", false);
-        return;
-    }
+// btnBenchmark?.addEventListener('click', async () => {
+//     if (!benchmarkChartCanvas) return;
+//     if (typeof Chart === "undefined") {
+//         showStatus(benchmarkStatus, "Chart.js library not available. Please check your internet connection or verify the CDN URL in index.html.", false);
+//         return;
+//     }
 
-    btnBenchmark.disabled = true;
-    toggleSpinner(benchmarkSpinner, true);
-    if (benchmarkStatus) benchmarkStatus.style.display = "none";
+//     btnBenchmark.disabled = true;
+//     toggleSpinner(benchmarkSpinner, true);
+//     if (benchmarkStatus) benchmarkStatus.style.display = "none";
 
-    const durations = [];
+//     const durations = [];
 
-    try {
-        for (const iterationCount of BENCHMARK_ITERATIONS) {
-            const salt = window.crypto.getRandomValues(new Uint8Array(SALT_BYTE_LENGTH));
-            const { duration } = await deriveKeyWithTiming("benchmark-password", salt, iterationCount);
-            durations.push(duration);
-        }
+//     try {
+//         for (const iterationCount of BENCHMARK_ITERATIONS) {
+//             const salt = window.crypto.getRandomValues(new Uint8Array(SALT_BYTE_LENGTH));
+//             const { duration } = await deriveKeyWithTiming("benchmark-password", salt, iterationCount);
+//             durations.push(duration);
+//         }
 
-        const context = benchmarkChartCanvas.getContext('2d');
-        if (pbkdf2Chart) {
-            pbkdf2Chart.destroy();
-        }
-        pbkdf2Chart = new Chart(context, {
-            type: "line",
-            data: {
-                labels: BENCHMARK_ITERATIONS.map((val) => val.toLocaleString()),
-                datasets: [
-                    {
-                        label: "PBKDF2 derivation time (ms)",
-                        data: durations.map((v) => Number(v.toFixed(1))),
-                        borderColor: getPrimaryColor(),
-                        backgroundColor: colorWithAlpha(getPrimaryColor(), 0.1),
-                        tension: 0.25,
-                        fill: true,
-                        pointRadius: 4,
-                        pointHoverRadius: 5
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    title: {
-                        display: true,
-                        text: "PBKDF2 iteration benchmark (ms)"
-                    },
-                    legend: {
-                        display: false
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: (ctx) => `${ctx.parsed.y.toFixed(1)} ms`
-                        }
-                    }
-                },
-                scales: {
-                    x: {
-                        title: {
-                            display: true,
-                            text: "Iterations"
-                        }
-                    },
-                    y: {
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: "Milliseconds"
-                        }
-                    }
-                }
-            }
-        });
+//         const context = benchmarkChartCanvas.getContext('2d');
+//         if (pbkdf2Chart) {
+//             pbkdf2Chart.destroy();
+//         }
+//         pbkdf2Chart = new Chart(context, {
+//             type: "line",
+//             data: {
+//                 labels: BENCHMARK_ITERATIONS.map((val) => val.toLocaleString()),
+//                 datasets: [
+//                     {
+//                         label: "PBKDF2 derivation time (ms)",
+//                         data: durations.map((v) => Number(v.toFixed(1))),
+//                         borderColor: getPrimaryColor(),
+//                         backgroundColor: colorWithAlpha(getPrimaryColor(), 0.1),
+//                         tension: 0.25,
+//                         fill: true,
+//                         pointRadius: 4,
+//                         pointHoverRadius: 5
+//                     }
+//                 ]
+//             },
+//             options: {
+//                 responsive: true,
+//                 maintainAspectRatio: false,
+//                 plugins: {
+//                     title: {
+//                         display: true,
+//                         text: "PBKDF2 iteration benchmark (ms)"
+//                     },
+//                     legend: {
+//                         display: false
+//                     },
+//                     tooltip: {
+//                         callbacks: {
+//                             label: (ctx) => `${ctx.parsed.y.toFixed(1)} ms`
+//                         }
+//                     }
+//                 },
+//                 scales: {
+//                     x: {
+//                         title: {
+//                             display: true,
+//                             text: "Iterations"
+//                         }
+//                     },
+//                     y: {
+//                         beginAtZero: true,
+//                         title: {
+//                             display: true,
+//                             text: "Milliseconds"
+//                         }
+//                     }
+//                 }
+//             }
+//         });
 
-        showStatus(benchmarkStatus, "Benchmark complete.", true);
-    } catch (err) {
-        console.error(err);
-        showStatus(benchmarkStatus, "Benchmark failed. Try again.", false);
-    } finally {
-        btnBenchmark.disabled = false;
-        toggleSpinner(benchmarkSpinner, false);
-    }
-});
+//         showStatus(benchmarkStatus, "Benchmark complete.", true);
+//     } catch (err) {
+//         console.error(err);
+//         showStatus(benchmarkStatus, "Benchmark failed. Try again.", false);
+//     } finally {
+//         btnBenchmark.disabled = false;
+//         toggleSpinner(benchmarkSpinner, false);
+//     }
+// });
