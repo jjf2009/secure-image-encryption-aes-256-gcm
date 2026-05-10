@@ -26,7 +26,6 @@ export const cacheDOMElements = () => ({
     spinner: document.getElementById("encrypt-spinner"),
     downloadArea: document.getElementById("download-area"),
     downloadButton: document.getElementById("btn-download-txt"),
-    ciphertextOutput: document.getElementById("ciphertext-output"),
   },
 
   // ========== DECRYPTION UI ==========
@@ -62,6 +61,7 @@ export const cacheDOMElements = () => ({
   stats: {
     mode: document.getElementById("stat-mode"),
     pbkdf2: document.getElementById("stat-pbkdf2"),
+    compression: document.getElementById("stat-compression"),
     operation: document.getElementById("stat-operation"),
     fileSize: document.getElementById("stat-filesize"),
     throughput: document.getElementById("stat-throughput"),
@@ -89,10 +89,12 @@ export const cacheDOMElements = () => ({
     entropyValue: document.getElementById("round-entropy-value"),
     pill: document.getElementById("round-pill"),
     currentCanvasLabel: document.getElementById("round-current-label"),
+    deviationValue: document.getElementById("round-deviation-value"),
 
     // Canvas elements
     originalCanvas: document.getElementById("round-original-canvas"),
     currentCanvas: document.getElementById("round-current-canvas"),
+    diffCanvas: document.getElementById("round-diff-canvas"),
     filmstrip: document.getElementById("round-filmstrip"),
 
     // Histogram canvases

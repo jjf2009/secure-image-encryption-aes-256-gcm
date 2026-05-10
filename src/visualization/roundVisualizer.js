@@ -29,6 +29,22 @@ import {
   deriveRoundKeys,
 } from "./aesAlgorithm.js";
 
+const SUB_ROUND_TITLES = [
+  "Start of Round 1",
+  "Step 1: SubBytes",
+  "Step 2: ShiftRows",
+  "Step 3: MixColumns",
+  "Step 4: AddRoundKey"
+];
+
+const SUB_ROUND_DESCRIPTIONS = [
+  "This is the state after the initial Key Addition (Round 0). The image is already partially scrambled but patterns remain.",
+  "<b>SubBytes (Confusion):</b> A non-linear substitution where each byte is replaced with another according to a lookup table (S-Box). This breaks the direct link between input and output values.",
+  "<b>ShiftRows (Diffusion):</b> A transposition step where the rows of the data matrix are cyclically shifted. This spreads the influence of single bytes across the row.",
+  "<b>MixColumns (Diffusion):</b> A mixing operation that operates on the columns of the state, combining the four bytes in each column. This further increases diffusion by linking all bytes in a column.",
+  "<b>AddRoundKey:</b> The only step where the <b>Secret Key</b> is actually combined with the data (using a bitwise XOR). This finalizes the scrambling for this round."
+];
+
 /**
  * Computes histogram of image pixel values.
  * Used to analyze entropy progression across rounds.
@@ -41,6 +57,48 @@ import {
  * @param {ImageData} data - Image data to analyze
  * @returns {Object} { histogram: array, total: count }
  */
+/**
+ * Builds intermediate states for a single AES round (Deep Inspection).
+ */
+async function buildSubRoundStates(baseImageData, roundKeys, width, height) {
+  const states = [];
+  const entropies = [];
+  const deviationPercentages = [];
+  
+  // Initial state for visualization is the result of Round 0 (AddRoundKey)
+  let currentData = applyAddRoundKey(baseImageData.data, roundKeys[0] || new Uint8Array(32));
+  const originalBuffer = currentData.slice();
+  
+  const captureState = (data) => {
+    const imageData = new ImageData(new Uint8ClampedArray(data), width, height);
+    states.push(imageData);
+    entropies.push(calculateEntropy(data));
+    deviationPercentages.push(computeRoundDifference(originalBuffer, data).changePercentage);
+    return data;
+  };
+  
+  // Step 0: Start of Round 1
+  currentData = captureState(currentData);
+  
+  // Step 1: SubBytes (Confusion)
+  currentData = applySubBytes(currentData);
+  currentData = captureState(currentData);
+  
+  // Step 2: ShiftRows (Diffusion)
+  currentData = applyShiftRows(currentData, width, height);
+  currentData = captureState(currentData);
+  
+  // Step 3: MixColumns (Diffusion)
+  currentData = applyMixColumns(currentData, width, height);
+  currentData = captureState(currentData);
+  
+  // Step 4: AddRoundKey (Final Round 1 Result)
+  currentData = applyAddRoundKey(currentData, roundKeys[1] || roundKeys[0]);
+  currentData = captureState(currentData);
+  
+  return { states, entropies, deviationPercentages };
+}
+
 const histogramFromData = (data) => {
   const histogram = new Uint32Array(256);
   let total = 0;
@@ -53,7 +111,7 @@ const histogramFromData = (data) => {
     total += 3; // Count 3 bytes per pixel
   }
 
-  return { histogram: Array.from(histogram), total };
+  return { histogram, total };
 };
 
 /**
@@ -87,6 +145,46 @@ const entropyFromHistogram = ({ histogram, total }) => {
 };
 
 /**
+ * High-level helper to calculate entropy directly from pixel data.
+ */
+const calculateEntropy = (data) => {
+  return entropyFromHistogram(histogramFromData(data));
+};
+
+/**
+ * Computes the visual and numerical difference between two image states.
+ * 
+ * @param {Uint8ClampedArray} original - Original image bytes (RGBA)
+ * @param {Uint8ClampedArray} current - Current round bytes (RGBA)
+ * @returns {Object} { diffData: Uint8ClampedArray, changePercentage: number }
+ */
+const computeRoundDifference = (original, current) => {
+  const len = original.length;
+  const diffData = new Uint8ClampedArray(len);
+  let changedPixels = 0;
+
+  for (let i = 0; i < len; i += 4) {
+    // RGB Difference
+    const dr = Math.abs(current[i] - original[i]);
+    const dg = Math.abs(current[i + 1] - original[i + 1]);
+    const db = Math.abs(current[i + 2] - original[i + 2]);
+
+    diffData[i] = dr;
+    diffData[i + 1] = dg;
+    diffData[i + 2] = db;
+    diffData[i + 3] = 255; // Keep difference map opaque
+
+    // Count as changed if any color channel differs
+    if (dr > 0 || dg > 0 || db > 0) {
+      changedPixels++;
+    }
+  }
+
+  const changePercentage = (changedPixels / (len / 4)) * 100;
+  return { diffData, changePercentage };
+};
+
+/**
  * Builds all 15 round states by applying AES operations to image data.
  *
  * PROCESS:
@@ -109,6 +207,8 @@ const buildRoundStates = async (baseImageData, roundKeys, onProgress) => {
   const hist0 = histogramFromData(baseImageData.data);
   const histograms = [hist0.histogram];
   const entropies = [entropyFromHistogram(hist0)];
+  const diffs = [new Uint8ClampedArray(baseImageData.data.length)]; // Round 0 diff is zero
+  const changePercentages = [0];
   let prevData = baseImageData.data;
 
   for (let r = 1; r <= ROUND_STATES_TOTAL; r++) {
@@ -148,13 +248,21 @@ const buildRoundStates = async (baseImageData, roundKeys, onProgress) => {
     histograms.push(hist.histogram);
     entropies.push(entropyFromHistogram(hist));
 
+    // Compute difference from original (Round 0)
+    const { diffData, changePercentage } = computeRoundDifference(
+      baseImageData.data,
+      working,
+    );
+    diffs.push(diffData);
+    changePercentages.push(changePercentage);
+
     prevData = imageData.data;
 
     // Yield to browser to keep UI responsive
     await new Promise((resolve) => requestAnimationFrame(resolve));
   }
 
-  return { states, histograms, entropies };
+  return { states, histograms, entropies, diffs, changePercentages };
 };
 
 /**
@@ -220,6 +328,8 @@ export const resetRoundVisualizer = (
   elements.roundStates = [];
   elements.roundHistograms = [];
   elements.roundEntropies = [];
+  elements.roundDiffs = [];
+  elements.roundChangePercentages = [];
   elements.roundThumbRefs = [];
 
   // Clear charts
@@ -246,40 +356,70 @@ const setRoundDisplay = (roundIndex, elements) => {
 
   const {
     roundStates,
-    roundHistograms,
     roundEntropies,
-    roundNumberEl,
-    roundTitleEl,
-    roundEntropyEl,
-    roundPill,
-    roundCurrentCanvasLabel,
-    roundRange,
-    roundCurrentCanvas,
-    roundOriginalCanvas,
+    numberEl,
+    titleEl,
+    entropyEl,
+    pill,
+    currentCanvasLabel,
+    range,
+    currentCanvas,
+    originalCanvas,
+    roundDiffCanvas,
+    roundDeviationEl,
     badges,
+    descriptionEl, // New element for educational text
   } = elements;
 
   elements.roundCurrentIndex = roundIndex;
 
   // Update display elements
   const padded = roundIndex.toString().padStart(2, "0");
-  if (roundRange) roundRange.value = String(roundIndex);
-  if (roundNumberEl) roundNumberEl.textContent = padded;
-  if (roundTitleEl)
-    roundTitleEl.textContent =
-      ROUND_TITLES[roundIndex] || `Round ${roundIndex}`;
-  if (roundPill) roundPill.textContent = `R${padded}`;
-  if (roundCurrentCanvasLabel)
-    roundCurrentCanvasLabel.textContent = `R${padded} — Current`;
+  if (range) range.value = String(roundIndex);
+  if (numberEl) numberEl.textContent = padded;
+  
+  // Use SUB_ROUND titles and descriptions
+  if (titleEl) {
+    titleEl.textContent = SUB_ROUND_TITLES[roundIndex] || `Step ${roundIndex}`;
+  }
+  if (pill) pill.textContent = `STEP ${roundIndex}`;
+  if (currentCanvasLabel) {
+    currentCanvasLabel.textContent = SUB_ROUND_TITLES[roundIndex] || `Step ${roundIndex}`;
+  }
+  if (descriptionEl) {
+    descriptionEl.innerHTML = SUB_ROUND_DESCRIPTIONS[roundIndex] || "";
+  }
 
   // Update entropy display
-  if (roundEntropyEl && roundEntropies[roundIndex] !== undefined) {
-    roundEntropyEl.textContent = `${roundEntropies[roundIndex].toFixed(3)} bits`;
+  if (entropyEl && roundEntropies[roundIndex] !== undefined) {
+    entropyEl.textContent = `${roundEntropies[roundIndex].toFixed(2)} bits`;
   }
 
   // Update visual elements
-  updateRoundBadges(roundIndex, badges);
-  drawImageDataToCanvas(roundCurrentCanvas, roundStates[roundIndex]);
+  const ops = ["none", "subbytes", "shiftrows", "mixcolumns", "addroundkey"];
+  const currentOp = ops[roundIndex];
+  
+  badges?.forEach(badge => {
+    badge.classList.toggle("active", badge.dataset.op === currentOp);
+  });
+  
+  drawImageDataToCanvas(currentCanvas, roundStates[roundIndex]);
+
+  // Update Difference Canvas if available
+  if (roundDiffCanvas && elements.roundDiffs[roundIndex]) {
+    const diffImageData = new ImageData(
+      elements.roundDiffs[roundIndex],
+      roundStates[roundIndex].width,
+      roundStates[roundIndex].height,
+    );
+    drawImageDataToCanvas(roundDiffCanvas, diffImageData);
+  }
+
+  // Update Deviation % if available
+  if (roundDeviationEl && elements.roundChangePercentages[roundIndex] !== undefined) {
+    roundDeviationEl.textContent = `${elements.roundChangePercentages[roundIndex].toFixed(2)}%`;
+  }
+
   updateHistogramCharts(roundIndex, elements);
   highlightFilmstrip(roundIndex, elements.roundThumbRefs);
 };
@@ -475,9 +615,9 @@ const startRoundPlayback = (elements) => {
   }
 
   elements.playTimer = setInterval(() => {
-    const next = (elements.roundCurrentIndex + 1) % (ROUND_STATES_TOTAL + 1);
+    const next = (elements.roundCurrentIndex + 1) % 5; // 5 steps total
     setRoundDisplay(next, elements);
-  }, ROUND_PLAY_INTERVAL_MS);
+  }, 1500); // Slower interval for sub-round visualization
 };
 
 /**
@@ -523,7 +663,7 @@ export const initializeRoundControls = (elements) => {
 
   elements.nextBtn?.addEventListener("click", () => {
     stopRoundPlayback(elements);
-    const next = (elements.roundCurrentIndex + 1) % (ROUND_STATES_TOTAL + 1);
+    const next = (elements.roundCurrentIndex + 1) % 5;
     setRoundDisplay(next, elements);
   });
 
@@ -554,7 +694,9 @@ export const startRoundVisualizer = async (
   if (!file) return;
 
   resetRoundVisualizer(elements, "Computing rounds...");
-  elements.card.style.display = "block";
+  if (elements.card) {
+    elements.card.style.display = "block";
+  }
 
   const updateProgress = (round) => {
     const pct = Math.min(100, Math.round((round / ROUND_STATES_TOTAL) * 100));
@@ -589,7 +731,11 @@ export const startRoundVisualizer = async (
     } else {
       const saltBytes =
         encryptionSalt || window.crypto.getRandomValues(new Uint8Array(16));
-      const derivedKey = await deriveKeyFn(password || "", saltBytes);
+      const result = await deriveKeyFn(password || "", saltBytes);
+      
+      // Handle both raw CryptoKey and timing-wrapped object
+      const derivedKey = result.key || result;
+      
       const rawDerived = await window.crypto.subtle.exportKey(
         "raw",
         derivedKey,
@@ -598,20 +744,21 @@ export const startRoundVisualizer = async (
     }
 
     // Generate round keys and build states
-    const roundKeys = deriveRoundKeys(baseKeyBytes, ROUND_STATES_TOTAL);
-    const { states, histograms, entropies } = await buildRoundStates(
+    const roundKeys = deriveRoundKeys(baseKeyBytes, 2); 
+    const { states, entropies, deviationPercentages } = await buildSubRoundStates(
       baseImageData,
       roundKeys,
-      updateProgress,
+      baseImageData.width,
+      baseImageData.height
     );
 
     // Store results
     elements.roundStates = states;
-    elements.roundHistograms = histograms;
     elements.roundEntropies = entropies;
+    elements.roundChangePercentages = deviationPercentages;
 
     // Render visualizer
-    drawImageDataToCanvas(elements.originalCanvas, states[0]);
+    drawImageDataToCanvas(elements.originalCanvas, baseImageData);
     drawImageDataToCanvas(elements.currentCanvas, states[0]);
 
     elements.roundThumbRefs = buildFilmstrip(
@@ -621,8 +768,13 @@ export const startRoundVisualizer = async (
         stopRoundPlayback(elements);
         setRoundDisplay(idx, elements);
       },
-      0,
+      0
     );
+
+    // Adjust range for 5 steps
+    if (elements.range) {
+      elements.range.max = "4";
+    }
 
     setRoundDisplay(0, elements);
 

@@ -141,7 +141,7 @@ export const updatePasswordStrengthUI = ({
 
   if (strengthLabel) {
     strengthLabel.textContent = strength.label;
-    strengthLabel.className = `strength-text ${labelClass}`;
+    strengthLabel.className = `strength-text ${labelClass}-text`;
   }
 
   // Show warning if minimum length not met

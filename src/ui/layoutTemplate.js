@@ -43,7 +43,7 @@ export const getAppLayoutMarkup = () => `
           <div class="password-strength-block" id="password-strength-block">
             <div class="strength-row">
               <span
-                class="strength-text strength-weak"
+                class="strength-text strength-weak-text"
                 id="password-strength-label"
                 aria-live="polite"
                 >Weak</span
@@ -174,13 +174,77 @@ export const getAppLayoutMarkup = () => `
           Download Restored Image
         </a>
       </section>
+      <!-- AES Round Visualizer: Side-by-Side Comparison -->
+      <section class="card round-visualizer-card" id="round-visualizer-card" style="display: none">
+        <div class="card-header">
+          <div class="header-with-pill">
+            <h2>AES Transformation Analysis</h2>
+            <span class="round-pill" id="round-pill">R00</span>
+          </div>
+          <p id="round-title">Original Image vs. Encrypted State</p>
+        </div>
+
+        <!-- Progress bar for computation -->
+        <div id="round-loading" class="visualizer-loading">
+          <p id="round-loading-text">Computing AES Round States...</p>
+          <div class="loading-bar-container">
+            <div id="round-loading-progress" class="loading-bar"></div>
+          </div>
+        </div>
+
+        <div id="round-visualizer-body" class="visualizer-body" style="display: none">
+          <!-- Main Side-by-Side Comparison -->
+          <div class="visualizer-main-grid">
+            <div class="visualizer-view">
+              <span class="view-label">Original Image</span>
+              <canvas id="round-original-canvas" class="compare-canvas"></canvas>
+            </div>
+            <div class="visualizer-view">
+              <span class="view-label" id="round-current-label">Round 00 — State</span>
+              <canvas id="round-current-canvas" class="compare-canvas"></canvas>
+            </div>
+          </div>
+
+          <!-- Key Metrics -->
+          <div class="visualizer-stats">
+            <div class="v-stat">
+              <span class="v-label">Information Entropy</span>
+              <span class="v-value" id="round-entropy-value">0.00 bits</span>
+            </div>
+            <div class="v-stat">
+              <span class="v-label">Avalanche Deviation</span>
+              <span class="v-value" id="round-deviation-value">0.00%</span>
+            </div>
+          </div>
+
+          <!-- Navigation & Playback -->
+          <div class="visualizer-controls">
+            <div class="control-row">
+              <button id="round-prev" class="btn btn-icon" title="Previous Round">←</button>
+              <input type="range" id="round-range" min="0" max="14" value="0" step="1" />
+              <button id="round-next" class="btn btn-icon" title="Next Round">→</button>
+            </div>
+            <button id="round-play" class="btn btn-secondary" style="width: auto; padding: 0.75rem 2.5rem;">
+              Play Encryption Sequence
+            </button>
+          </div>
+
+          <!-- Visual Timeline -->
+          <div class="filmstrip-container">
+             <div id="round-filmstrip" class="filmstrip"></div>
+          </div>
+
+          <!-- Educational Explanation -->
+          <div class="sub-round-description-box">
+             <div id="sub-round-description" class="sub-round-description">
+               Select a step above to see how AES transforms data.
+             </div>
+          </div>
+        </div>
+      </section>
     </main>
 
-    <p class="attack-explainer">
-      AES-GCM uses an authentication tag to guarantee integrity. Even a single
-      bit change in ciphertext causes decryption to fail — this is called
-      authenticated encryption.
-    </p>
+
 
     <footer>
       <p>&copy; 2026 Project SecureImage // Client-Side AES-256-GCM Protocol</p>

@@ -89,13 +89,20 @@ const withTiming = async (operation) => {
  *
  * @param {Object} stats - { mode, pbkdf2Ms, operationMs, fileSizeBytes }
  */
-const updateStatsPanel = ({ mode, pbkdf2Ms, operationMs, fileSizeBytes }) => {
+const updateStatsPanel = ({
+  mode,
+  pbkdf2Ms,
+  compressionMs,
+  operationMs,
+  fileSizeBytes,
+}) => {
   const dom = appState.dom.stats;
   if (!dom.mode || !dom.pbkdf2 || !dom.operation || !dom.fileSize) return;
 
   const displayMode = mode || "Operation";
   dom.mode.textContent = `Last ${displayMode}`;
   dom.pbkdf2.textContent = `${pbkdf2Ms.toFixed(1)} ms`;
+  dom.compression.textContent = `${(compressionMs || 0).toFixed(1)} ms`;
   dom.operation.textContent = `${operationMs.toFixed(1)} ms`;
   dom.fileSize.textContent = formatBytes(fileSizeBytes);
 
@@ -183,6 +190,7 @@ const handleEncryption = async () => {
     updateStatsPanel({
       mode: "Encryption",
       pbkdf2Ms: timingInfo.pbkdf2Ms,
+      compressionMs: timingInfo.compressionMs,
       operationMs: timingInfo.encryptionMs,
       fileSizeBytes: metadata.size,
     });
@@ -190,7 +198,6 @@ const handleEncryption = async () => {
     // For UI features
     appState.lastEncryptedPayload = ciphertext;
     appState.lastEncryptionPassword = password;
-    dom.encryption.ciphertextOutput.value = ciphertext;
 
     // Show visual comparisons
     await renderComparisonPanel(file, ciphertextWithTag, dom.comparison);
@@ -305,6 +312,7 @@ const handleDecryption = async () => {
     updateStatsPanel({
       mode: "Decryption",
       pbkdf2Ms: timingInfo.pbkdf2Ms,
+      compressionMs: timingInfo.decompressionMs,
       operationMs: timingInfo.decryptionMs,
       fileSizeBytes: normalizedMetadata.size,
     });
@@ -398,7 +406,10 @@ export const initializeApp = async () => {
     entropyEl: dom.roundVisualizer.entropyValue,
     pill: dom.roundVisualizer.pill,
     currentCanvasLabel: dom.roundVisualizer.currentCanvasLabel,
+    roundDiffCanvas: dom.roundVisualizer.diffCanvas,
+    roundDeviationEl: dom.roundVisualizer.deviationValue,
     range: dom.roundVisualizer.range,
+    descriptionEl: document.getElementById("sub-round-description"),
     prevBtn: dom.roundVisualizer.prevBtn,
     nextBtn: dom.roundVisualizer.nextBtn,
     playBtn: dom.roundVisualizer.playBtn,

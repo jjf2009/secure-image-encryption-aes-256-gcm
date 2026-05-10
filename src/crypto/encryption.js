@@ -20,6 +20,7 @@
  */
 
 import { arrayBufferToBase64, base64ToArrayBuffer } from "../utils/encoding.js";
+import { compressData, decompressData } from "../utils/compression.js";
 import { METADATA_DELIMITER } from "../utils/constants.js";
 
 /**
@@ -53,12 +54,18 @@ export const encryptFile = async (
     name: file.name || "file.bin",
     type: file.type || "application/octet-stream",
     size: file.size,
+    compressed: true,
   };
 
   // Step 2: Build payload: [metadata_length][metadata][delimiter][file_data]
   const metadataBytes = encoder.encode(JSON.stringify(metadata));
   const delimiterBytes = encoder.encode(METADATA_DELIMITER);
-  const fileBytes = new Uint8Array(await file.arrayBuffer());
+  
+  // Compress file data before encryption
+  const rawFileBytes = new Uint8Array(await file.arrayBuffer());
+  const { data: fileBytes, duration: compressionMs } = await timingWrapper(
+    () => compressData(rawFileBytes)
+  );
 
   // Create header: 4-byte length field (little-endian) for metadata
   const metadataLengthBytes = new Uint8Array(4);
@@ -122,6 +129,7 @@ export const encryptFile = async (
     salt: salt, // For round visualizer
     timingInfo: {
       pbkdf2Ms,
+      compressionMs,
       encryptionMs,
       fileSizeBytes: metadata.size,
     },
@@ -253,13 +261,24 @@ export const decryptFile = async (
     throw new Error("Failed to parse embedded metadata.");
   }
 
+  // Step 7: Decompress if necessary
+  let finalFileBytes = fileBytes;
+  let decompressionMs = 0;
+
+  if (metadata.compressed) {
+    const decompressed = await timingWrapper(() => decompressData(fileBytes));
+    finalFileBytes = decompressed.data;
+    decompressionMs = decompressed.duration;
+  }
+
   return {
-    fileBytes: fileBytes,
+    fileBytes: finalFileBytes,
     metadata: metadata,
     timingInfo: {
       pbkdf2Ms,
       decryptionMs,
-      fileSizeBytes: fileBytes.length,
+      decompressionMs,
+      fileSizeBytes: finalFileBytes.length,
     },
   };
 };

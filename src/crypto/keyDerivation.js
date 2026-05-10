@@ -54,7 +54,7 @@ const deriveKeyInternal = async (password, salt, iterations) => {
     },
     passwordKey,
     { name: "AES-GCM", length: 256 }, // Output is AES-GCM compatible
-    false, // Not extractable (stays in crypto context)
+    true, // Must be extractable for the Visualizer to derive round keys
     ["encrypt", "decrypt"], // Can be used for both operations
   );
 };
